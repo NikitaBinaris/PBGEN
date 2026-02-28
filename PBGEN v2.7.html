@@ -1903,11 +1903,26 @@ async function createOverviewImage() {
       if(book.meta && book.meta.daysCount) daysCountInput.value = book.meta.daysCount;
 
       const imageFiles = {};
+      const normalizeImageName = (entry) => {
+        if (!entry) return '';
+        if (typeof entry === 'string') return entry;
+        if (typeof entry === 'object') {
+          return entry.name || entry.file || entry.image || entry.filename || entry.path || '';
+        }
+        return String(entry || '');
+      };
       const imgNames = new Set();
-      (book.galleryDays || []).forEach(day => day.files.forEach(n=>imgNames.add(n)));
+      (book.galleryDays || []).forEach(day => {
+        const files = Array.isArray(day?.files) ? day.files : [];
+        files.forEach(fileEntry => {
+          const normalized = normalizeImageName(fileEntry);
+          if (normalized) imgNames.add(normalized);
+        });
+      });
       for(const sp of (book.spreads||[])){
         for(const s of (sp.slots||[])){
-          if(s.image) imgNames.add(s.image);
+          const normalized = normalizeImageName(s?.image);
+          if(normalized) imgNames.add(normalized);
         }
       }
 
@@ -2051,8 +2066,10 @@ state.days = [];
       if(book.galleryDays && Array.isArray(book.galleryDays)){
         for(const dayData of book.galleryDays){
           const dayItems = [];
-          for(const name of dayData.files){
-            if(imageFiles[name]) dayItems.push({ id: 'g' + Date.now() + Math.random(), file: imageFiles[name], preview: URL.createObjectURL(imageFiles[name]) });
+          const dayFiles = Array.isArray(dayData?.files) ? dayData.files : [];
+          for(const fileEntry of dayFiles){
+            const name = normalizeImageName(fileEntry);
+            if(name && imageFiles[name]) dayItems.push({ id: 'g' + Date.now() + Math.random(), file: imageFiles[name], preview: URL.createObjectURL(imageFiles[name]) });
           }
           state.days.push({ name: dayData.name || `День ${state.days.length + 1}`, items: dayItems });
         }
@@ -2071,7 +2088,8 @@ state.days = [];
 
       renumber();
       if(typeof missingNames !== 'undefined' && missingNames.length){
-        alert('Книга частично загружена. Не найдены изображения: ' + missingNames.join(', ') + '. Они пропущены.');
+        const uniqueMissing = [...new Set(missingNames.map(normalizeImageName).filter(Boolean))];
+        alert('Книга частично загружена. Не найдены изображения: ' + uniqueMissing.join(', ') + '. Они пропущены.');
       } else {
         alert('Книга загружена успешно.');
       }
