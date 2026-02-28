@@ -1,0 +1,2591 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PBGEN v2.6</title>
+
+<style>
+:root{
+  --cw:800px; --ch:538px; --bleed:32px; --safe:42px; --center:400px; --gap2:10px;
+}
+*{box-sizing:border-box}
+body{margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; background:#222; color:#eee; display:flex; flex-direction:column; min-height:100vh;}
+.topbar{position:sticky; top:0; z-index:200; display:flex; gap:8px; align-items:center; padding:10px; background:#141414; border-bottom:1px solid #333;}
+.topbar input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: #1d1d1d;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.4;
+  height: 40px; /* точная высота, как у select/btn */
+  box-sizing: border-box;
+}
+.topbar input[type="number"]{flex:0 0 80px;}
+/* Общий стиль для кнопок и селекторов */
+/* Общий стиль — только фон, цвет, бордер и т.д. */
+.btn, select {
+  background: #2b2b2b;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.4;
+  min-width: 80px;
+  text-align: left;
+}
+
+/* Только кнопки — нормальные отступы */
+.btn {
+  padding: 8px 12px;
+}
+
+/* Только селекторы — стрелка + отступ справа */
+select {
+  padding: 8px 32px 8px 12px; /* top, right, bottom, left */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3e%3cpath fill='%23aaa' d='M2 4l4 4 4-4z'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px;
+}
+/* Кнопки в пейджере — компактные, без лишнего padding */
+.gallery-pager .btn {
+  padding: 4px 8px;
+  min-width: auto;
+  font-size: 12px;
+}
+.btn:hover{background:#3a3a3a}
+#spreads{display:flex; gap:24px; padding:18px; overflow-x:auto; flex:1; scroll-behavior:smooth}
+.spread-wrap{display:flex; flex-direction:column; align-items:center; gap:8px; scroll-snap-align:center}
+.spread{position:relative; width:var(--cw); height:var(--ch); background:#fff; border-radius:8px; box-shadow:0 12px 30px rgba(0,0,0,.45); overflow:hidden}
+.spread-wrap.active .spread{outline:3px solid #49aaff}
+.line-red,.line-green,.line-center{position:absolute; pointer-events:none; z-index:120}
+.line-red{inset:var(--bleed); border:1px solid red}
+.line-green{inset:var(--safe); border:1px solid #27ae60}
+.line-center{top:0; bottom:0; left:var(--center); width:1px; background:#2196f3}
+.slot{position:absolute; background:#f6f6f6; border:1px dashed #bbb; overflow:hidden; z-index:10}
+.slot.drag-over{outline:2px dashed #49aaff; outline-offset:-4px}
+.slot .hint{position:absolute; inset:0; display:grid; place-items:center; color:#666; font-size:12px}
+.slot-img{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); transform-origin:center center; user-select:none; pointer-events:none; background:transparent; border:0; box-shadow:none; display:block}
+/* remove white-ish outlines on images */
+
+/* gallery thumbnail layout tweaks */
+.gallery-thumb-wrap{position:relative; width:116px; height:116px; overflow:hidden; border-radius:6px; background:#111; display:flex; align-items:center; justify-content:center;}
+.gallery-thumb{max-width:100%; max-height:100%; display:block;}
+.gdelete{position:absolute; right:6px; top:6px; z-index:90; background:rgba(0,0,0,0.6); border-radius:6px; padding:3px 6px;}
+.gdownload{position:absolute; right:6px; bottom:6px; z-index:90; background:rgba(0,0,0,0.6); border-radius:6px; padding:3px 6px; text-decoration:none; color:#fff; display:flex; align-items:center; justify-content:center;}
+.gname{margin:6px 0 0 0; font-size:12px; color:#bbb; text-align:center; max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; line-height:1.1;}
+.gallery-item{display:flex; flex-direction:column; align-items:center; width:140px;}
+.gallery-item img, .slot-img { background:transparent; border:0; box-shadow:none; display:block; }
+.slot-ui{position:absolute; left:6px; bottom:6px; display:flex; gap:6px; z-index:80; background:rgba(0,0,0,.55); padding:4px; border-radius:8px}
+.slot-ui {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.slot-ui button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #333;
+  color: #fff;
+  border: 1px solid #444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+}
+.footer{width:100%; display:flex; justify-content:space-between; gap:8px; color:#ddd; font-size:13px}
+.footer .muted{color:#aaa}
+#gallery {
+  display: flex;
+  gap: 10px;
+  padding: 10px 10px;
+  background: #171717;
+  border-top: 1px solid #333;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: flex-start;
+  min-height: 160px;
+  height: auto;
+}
+.gallery-uploader{width:116px; height:116px; background:#1b1b1b; border:1px dashed #444; border-radius:6px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; position:relative; color:#ccc; cursor:pointer; text-align:center; padding:8px}
+.gallery-uploader .hint{font-size:13px}
+.gallery-uploader input[type="file"]{position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%}
+.gallery-list{display:flex; gap:10px; align-items:center}
+.gallery-item{width:140px;height:auto;background:#252525;border:1px solid #444;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;position:relative;flex:0 0 auto; overflow:hidden;padding:8px 6px;}
+.gallery-item img{max-width:100%; max-height:100%; object-fit:cover; user-drag: none; -webkit-user-drag: none;}
+.gallery-item .gdelete{position:absolute; top:4px; right:4px; background:rgba(0,0,0,.6); border-radius:4px; padding:4px; cursor:pointer; border:1px solid #444; color:#fff; font-size:12px}
+.bottombar{display:flex; justify-content:space-between; gap:10px; padding:10px 12px; background:#141414; border-top:1px solid #333}
+.lefttools, .righttools{display:flex; gap:10px; align-items:center}
+.righttools .guides{display:flex; align-items:center; gap:8px; color:#ddd; font-size:13px}
+.hidden-file{display:none}
+@media (max-width:1100px){
+  :root{--cw:700px; --ch:470px}
+}
+
+/* left uploader fixed size per v1.2 */
+.gallery-uploader{width:200px; height:160px; min-width:200px; min-height:160px}
+/* make gallery-list take remaining space */
+.gallery-list{flex:1; overflow-x:auto}
+
+
+/* uploader overlay */
+.uploader-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:2000;}
+.uploader-overlay.hidden{display:none;}
+.uploader-overlay-inner{position:relative; width:80%; max-width:1000px; height:70%; background:#0f0f0f; border-radius:12px; padding:20px; box-shadow:0 10px 40px rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center;}
+.overlay-close{position:absolute; right:12px; top:12px; background:transparent; border:0; color:#fff; font-size:20px; cursor:pointer; z-index:2100; pointer-events:auto;}
+.overlay-drop{position:absolute;inset:0;width:100%;height:100%;border:2px dashed rgba(255,255,255,0.08);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#ddd;padding:20px;text-align:center;}
+.overlay-drop.drag-over{border-color:rgba(255,255,255,0.2);}
+.overlay-hint small{font-size:12px; color:#aaa;}
+
+/* small magnifier icon inside uploader */
+.gallery-uploader .magnifier{position:absolute; left:6px; top:6px; z-index:80; background:rgba(0,0,0,0.45); padding:4px 6px; border-radius:6px; cursor:pointer;}
+
+/* gallery pager styles */
+.gallery-pager {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #ddd;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  height: 100%; /* растягиваем по высоте галереи */
+  min-height: 140px; /* минимальная высота, чтобы не сжималось */
+}
+.gallery-pager .row{display:flex; gap:6px; align-items:center;}
+.gallery-pager .btn {
+  height: 32px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  min-width: auto;
+  border-radius: 6px;
+  background: #2b2b2b;
+  color: #fff;
+  border: 1px solid #444;
+  cursor: pointer;
+}
+
+/* Стрелки — фиксированный размер 32×32 */
+#prevDay, #nextDay {
+  width: 32px;
+  font-size: 16px;
+  padding: 0;
+}
+
+/* Кнопки + и – — ширина по тексту */
+#addDay, #removeDay {
+  width: auto;
+  min-width: 32px;
+}
+.gallery-pager .info{color:#aaa;}
+/* === Редактирование обложки === */
+#coverEditor {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+#coverEditor.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#coverEditor {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.cover-text {
+  position: absolute;
+  color: white;
+  font-family: Arial;
+  user-select: none;
+  cursor: move;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+  z-index: 15;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.cover-text-item {
+  background: #2b2b2b;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #eee;
+}
+.cover-text-item button {
+  background: #c33;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cover-text:hover {
+  outline: 2px dashed #49aaff;
+  outline-offset: 2px;
+}
+.save-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.save-overlay.hidden { display: none; }
+.save-progress-container {
+  background: #1a1a1a;
+  padding: 32px 48px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+  text-align: center;
+  min-width: 320px;
+}
+.save-progress-title {
+  color: #fff;
+  font-size: 22px;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+.save-progress-bar {
+  height: 12px;
+  background: #333;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.save-progress-fill {
+  height: 100%;
+  background: #49aaff;
+  transition: width 0.3s ease;
+}
+.save-progress-text {
+  color: #ddd;
+  font-size: 18px;
+  margin-top: 12px;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <select id="daysCount" class="sel">
+  <option value="1">1 день</option>
+  <option value="2">2 дня</option>
+  <option value="3">3 дня</option>
+  <option value="4">4 дня</option>
+  <option value="5">5 дней</option>
+  <option value="6">6 дней</option>
+  <option value="7">7 дней</option>
+  </select>
+  <input id="bookTitle" type="text" placeholder="Название книги" />
+  <input id="expedition" type="text" placeholder="Экспедиция, например Алтай 26" />
+  <select id="viewMode" class="sel">
+  <option value="book" selected>Книга</option>
+  <option value="cover">Обложка</option>
+  </select>
+  <button class="btn" id="add">➕ Добавить разворот</button>
+  <button class="btn" id="remove">🗑 Удалить активный</button>
+  <span class="muted">Всего: <strong id="count">0</strong></span>
+</div>
+
+<div id="spreads" aria-label="Развороты"></div>
+<div id="coverEditor" class="hidden" style="position:fixed; right:16px; top:80px; width:300px; background:#1a1a1a; border:1px solid #444; border-radius:12px; padding:16px; z-index:500; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+  <h3 style="margin:0 0 12px; color:#fff; font-size:16px;">Редактирование обложки</h3>
+  
+  <div style="margin-bottom:12px;">
+    <input id="coverTextInput" type="text" placeholder="Введите текст" style="width:100%; padding:8px; border-radius:6px; border:1px solid #555; background:#2b2b2b; color:#fff; font-size:14px;" />
+  </div>
+
+  <div style="display:flex; gap:8px; margin-bottom:12px;">
+    <select id="coverFont" style="flex:1; padding:6px; border-radius:6px; background:#2b2b2b; color:#fff; border:1px solid #555;">
+      <option value="Arial">Arial</option>
+      <option value="Georgia">Georgia</option>
+      <option value="Impact">Impact</option>
+      <option value="Times New Roman">Times</option>
+      <option value="Helvetica">Helvetica</option>
+    </select>
+    <input id="coverSize" type="number" value="48" min="12" max="200" style="width:70px; padding:6px; border-radius:6px; background:#2b2b2b; color:#fff; border:1px solid #555;" />
+    <input id="coverColor" type="color" value="#ffffff" style="width:40px; height:36px; padding:0; border:none; border-radius:6px; cursor:pointer;" />
+  </div>
+
+  <button id="addCoverText" class="btn" style="width:100%; padding:10px; font-size:14px;">Добавить текст</button>
+
+  <div id="textList" style="margin-top:16px; max-height:300px; overflow-y:auto;">
+    <!-- Список текстов будет здесь -->
+  </div>
+</div>
+
+<div id="gallery" aria-label="Галерея изображений">
+  <div class="gallery-uploader" id="uploader"><span class="magnifier" id="openOverlay">🔍</span>
+
+    <div class="hint">➕ Добавить фото<br><small>перетащите или нажмите</small></div>
+    <input id="uploaderInput" type="file" multiple accept="image/*" />
+  </div>
+  <div id="gallery-list" class="gallery-list"></div>
+</div>
+
+<div id="uploaderOverlay" class="uploader-overlay hidden" aria-hidden="true">
+  <div class="uploader-overlay-inner">
+    <button id="overlayClose" class="overlay-close">✖</button>
+    <div id="overlayDrop" class="overlay-drop">
+      <div class="overlay-hint">Перетащите фотографии в форму или нажмите для выбора<br><small>Можно загрузить сразу много файлов, формат jpg, png</small></div>
+      <input id="uploaderInputLarge" type="file" multiple accept="image/*" class="hidden-file" />
+    </div>
+  </div>
+</div>
+
+<div class="bottombar">
+  <div class="lefttools">
+    <button class="btn" id="clearSpread">🧹 Очистить разворот</button>
+    <button class="btn" id="downloadZip">⬇ Скачать развороты ZIP</button>
+    <button class="btn" id="previewAll">👁 Сформировать превью</button>
+    <input id="loadBookInput" class="hidden-file" type="file" accept=".zip,application/zip" />
+  </div>
+  <div class="righttools">
+      <label class="muted">Формат:</label>
+      <select id="exportScale" class="sel">
+          <option value="original">Оригинал (1600×1076 / 1484×1076)</option>
+          <option value="medium">Увеличенный (3200×2152 / 2968×2152)</option>
+          <option value="large" selected>Большой (6400×4304 / 5936×4304)</option>
+      </select>
+      <label class="muted" style="margin-left:12px;">Сжимать JPEG</label>
+      <input type="checkbox" id="compressGalleryOriginals" checked>
+      <button class="btn" id="loadBook">📂 Загрузить книгу из ZIP</button>
+      <button class="btn" id="saveBook">💾 Сохранить книгу ZIP</button>
+  </div>
+    
+  </div>
+</div>
+
+
+<!-- Image preview modal (v1.2) -->
+<div id="imageModal" class="modal" aria-hidden="true" role="dialog">
+  <span class="close" id="modalClose" aria-label="Закрыть">&times;</span>
+  <img class="modal-content" id="modalImg" alt="Просмотр изображения" />
+</div>
+<style>
+/* modal styles v1.2 */
+.modal{display:none;position:fixed;z-index:9999;padding-top:60px;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.85)}
+.modal-content{margin:auto;display:block;max-width:90%;max-height:90%;box-shadow:0 4px 24px rgba(0,0,0,0.6)}
+#modalClose{position:absolute;top:18px;right:26px;color:#fff;font-size:38px;cursor:pointer;user-select:none}
+@media (max-width:600px){ .modal-content{max-width:95%; max-height:85%} }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+
+// Modal preview for gallery images (v1.2)
+(function(){
+  const modal = document.getElementById('imageModal');
+  const modalImg = document.getElementById('modalImg');
+  const modalClose = document.getElementById('modalClose');
+  function openModal(src, alt){
+    modalImg.src = src;
+    modalImg.alt = alt || '';
+    modal.style.display = 'block';
+    modal.setAttribute('aria-hidden','false');
+  }
+  function closeModal(){
+    modal.style.display = 'none';
+    modalImg.src = '';
+    modal.setAttribute('aria-hidden','true');
+  }
+  modalClose.addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e){ if(e.target===modal) closeModal(); });
+  // expose helper
+  window._openGalleryImage = openModal;
+  // Close modal with ESC
+  window.addEventListener('keydown', function(e){ if(e.key==='Escape'){ const modal = document.getElementById('imageModal'); if(modal && modal.style.display==='block'){ const modalClose = document.getElementById('modalClose'); if(modalClose) modalClose.click(); else modal.style.display='none'; }}});
+
+})();
+(() => {
+  // Logical sizes
+  const LOGICAL = { COVER_W:1600, SPREAD_W:1484, H:1076 };
+  const DISPLAY_SCALE = 0.5;
+  const DISPLAY = { COVER_W: Math.round(LOGICAL.COVER_W*DISPLAY_SCALE), SPREAD_W: Math.round(LOGICAL.SPREAD_W*DISPLAY_SCALE), H: Math.round(LOGICAL.H*DISPLAY_SCALE) };
+  const EXPORT_MULT = { original:1, medium:2, large:4 };
+
+  // Types 0..11
+  const TYPES = {
+    COVER: 'Тип 0 — Обложка',
+    T1: 'Тип 1 — 2 вертикальных слева, 1 большое справа',
+    T2: 'Тип 2 — зерк. (1 большое слева, 2 вертикальных справа)',
+    T3: 'Тип 3 — 2 сверху/2 снизу (лево: большая сверху, малая снизу)',
+    T4: 'Тип 4 — зеркал. горизонтально (лево: малая сверху, большая снизу)',
+    T5: 'Тип 5 — 2 вертикально слева, 2 вертикально справа',
+    T6: 'Тип 6 — 5 (2 сверху, 3 снизу)',
+    T7: 'Тип 7 — 2 горизонтально (stack)',
+    T8: 'Тип 8 — 2 вертикально (side-by-side)',
+    T9: 'Тип 9 — 2 сверху (в safe), 1 снизу (края)',
+    T10: 'Тип 10 — зерк. вертикально (1 сверху, 2 снизу)',
+    T11: 'Тип 11 — фон, полное изображение'
+  };
+
+  const seqTypes = [TYPES.T1,TYPES.T2,TYPES.T3,TYPES.T4,TYPES.T5,TYPES.T6,TYPES.T7,TYPES.T8,TYPES.T9,TYPES.T10];
+
+  const spreadsEl = document.getElementById('spreads');
+  const galleryListEl = document.getElementById('gallery-list');
+  const uploaderInput = document.getElementById('uploaderInput');
+  const uploaderWrap = document.getElementById('uploader');
+  const countEl = document.getElementById('count');
+  const btnAdd = document.getElementById('add');
+  const btnRemove = document.getElementById('remove');
+  const btnClear = document.getElementById('clearSpread');
+  const btnDownloadZip = document.getElementById('downloadZip');
+  const btnSaveBook = document.getElementById('saveBook');
+  const btnLoadBook = document.getElementById('loadBook');
+  const btnPreview = document.getElementById('previewAll');
+  const loadBookInput = document.getElementById('loadBookInput');
+  const bookTitleInput = document.getElementById('bookTitle');
+  const daysCountInput = document.getElementById('daysCount');
+  const expeditionInput = document.getElementById('expedition');
+
+  const state = { count:0, days: [{ name: "День 1", items: [] }], currentDay: 0 };
+
+  // Small visual overdraw for slots to avoid 1-2px white seams on right/bottom
+  const SLOT_EXTRA_DISPLAY = 2; // px added to slot width/height on display (test)
+
+
+  // Helpers
+  function el(tag, cls){ const e=document.createElement(tag); if(cls) e.className=cls; return e; }
+  function fmt2(n){ return n.toString().padStart(2,'0'); }
+  function tsName(){ const t=new Date(); const d=[fmt2(t.getDate()),fmt2(t.getMonth()+1),(t.getFullYear()%100).toString().padStart(2,'0')].join('.'); const hh=fmt2(t.getHours()), mm=fmt2(t.getMinutes()), ss=fmt2(t.getSeconds()); return `${d}_${hh}.${mm}.${ss}`; }
+  function captionForIndex(i,total){ if(i===0) return 'обложка'; if(i===total-1) return 'общее фото'; return 'разворот'; }
+  function renumber(){ const wraps=[...spreadsEl.children]; wraps.forEach((w,i)=>{ const num=w.querySelector('.num'); if(num) num.textContent=i; const cap=w.querySelector('.cap'); if(cap) cap.textContent=captionForIndex(i,wraps.length); }); countEl.textContent = wraps.length; }
+  function centerActive(wrap){ if(!wrap) return; const scRect = spreadsEl.getBoundingClientRect(); const wRect = wrap.getBoundingClientRect(); const delta = (wRect.left + wRect.width/2) - (scRect.left + scRect.width/2); spreadsEl.scrollBy({left: delta, behavior:'smooth'}); }
+
+  // Slot creation
+  function createSlot(x,y,w,h){
+    const slot = el('div','slot');
+    Object.assign(slot.style,{left:x+'px',top:y+'px',width:(w + SLOT_EXTRA_DISPLAY)+'px',height:(h + SLOT_EXTRA_DISPLAY)+'px'});
+    const input = el('input'); input.type='file'; input.accept='image/*'; input.style.display='none';
+    const hint = el('div','hint'); hint.textContent='Перетащите фото или нажмите 📁';
+    const img = el('img','slot-img'); img.draggable=false;
+    const ui = el('div','slot-ui');
+    const bUp = el('button'); bUp.textContent='📁'; bUp.title='Загрузить'; bUp.addEventListener('click', ()=> input.click());
+    const bClr = el('button'); bClr.textContent = 'X'; bClr.title = 'Очистить';
+    ui.appendChild(bClr);
+    bClr.addEventListener('click', () => {
+        if (!slot._st?.has) return;
+        if (confirm('Очистить это фото?')) {
+            const fileToReturn = slot._origFile;
+            const origDay = slot._origDay;
+            const origIndex = slot._origIndex;
+            img.removeAttribute('src');
+            slot._origFile = null;
+            hint.style.display = 'grid';
+            slot._st.has = false;
+            delete slot._origDay;
+            delete slot._origIndex;
+            if (fileToReturn) {
+                insertFileToGallery(fileToReturn, origDay, origIndex);
+            }
+        }
+    });
+    const bOut = el('button'); bOut.textContent='−'; bOut.title='Масштаб −'; bOut.addEventListener('click', ()=> zoom(1/1.1));
+    const bIn = el('button'); bIn.textContent='+'; bIn.title='Масштаб +'; bIn.addEventListener('click', ()=> zoom(1.1));
+    const bC = el('button'); bC.textContent='⟲'; bC.title='По центру'; bC.addEventListener('click', ()=> fit());
+    ui.append(bUp,bClr,bOut,bIn,bC);
+    slot.append(input,hint,img,ui);
+
+    const st = {has:false, iw:0, ih:0, fit:1, userScale:1, tx:0, ty:0, minS:1, maxS:8, dragging:false, sx:0, sy:0, stx:0, sty:0};
+    slot._st = st;
+
+    function size(){ return {w:slot.clientWidth, h:slot.clientHeight}; }
+    function apply(){ if(!st.has) return; const s = st.fit * st.userScale; const dW = st.iw * s, dH = st.ih * s; const SW = size().w, SH = size().h; if(st.userScale<1) st.userScale=1; const maxX=Math.max(0,(dW-SW)/2), maxY=Math.max(0,(dH-SH)/2); st.tx = Math.max(-maxX, Math.min(maxX, st.tx)); st.ty = Math.max(-maxY, Math.min(maxY, st.ty)); img.style.width = dW+'px'; img.style.height = dH+'px'; img.style.transform = `translate(${st.tx}px, ${st.ty}px) translate(-50%,-50%)`; }
+    function fit(){ if(!st.has) return; const SW = size().w, SH = size().h; st.fit = Math.max(SW/st.iw, SH/st.ih); st.userScale=1; st.tx=0; st.ty=0; apply(); }
+    function loadFile(file){ if(!file) return; slot._origFile=file; const fr=new FileReader(); fr.onload=e=>{ img.onload=()=>{ st.iw = img.naturalWidth; st.ih = img.naturalHeight; st.has=true; hint.style.display='none'; fit(); }; img.src=e.target.result; }; fr.readAsDataURL(file); }
+
+    // DnD
+    slot.addEventListener('dragenter', e=>{ e.preventDefault(); slot.classList.add('drag-over'); });
+    slot.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+    slot.addEventListener('dragleave', ()=> slot.classList.remove('drag-over'));
+      slot.addEventListener('drop', e => { e.preventDefault(); slot.classList.remove('drag-over'); const f = e.dataTransfer.files?.[0]; if (f) { loadFile(f); return } const text = e.dataTransfer.getData('text/plain') || ''; if (text && text.startsWith('gallery:')) { const id = text.split(':')[1]; const found = findGalleryItemWithIndices(id); if (found) { const { item, dayIdx, itemIdx } = found; removeGalleryItemById(id); loadFile(item.file); slot._origDay = dayIdx; slot._origIndex = itemIdx } } });
+
+    input.addEventListener('change', ()=>{ if(input.files && input.files[0]) loadFile(input.files[0]); });
+
+    // pan
+    slot.addEventListener('mousedown', e=>{ if(!st.has) return; st.dragging=true; st.sx=e.clientX; st.sy=e.clientY; st.stx=st.tx; st.sty=st.ty; slot.style.cursor='grabbing'; });
+    window.addEventListener('mousemove', e=>{ if(!st.dragging) return; st.tx = st.stx + (e.clientX - st.sx); st.ty = st.sty + (e.clientY - st.sy); apply(); });
+    window.addEventListener('mouseup', ()=>{ if(st.dragging){ st.dragging=false; slot.style.cursor='default'; } });
+
+    // zoom ctrl+wheel
+    slot.addEventListener('wheel', e=>{ if(e.ctrlKey || e.metaKey){ e.preventDefault(); const f = e.deltaY < 0 ? 1.1 : 1/1.1; zoom(f); } }, {passive:false});
+    function zoom(f){ st.userScale = Math.max(st.minS, Math.min(st.maxS, st.userScale * f)); apply(); }
+
+    return slot;
+  }
+
+  // Build layout for types 0..11 (with refined halved gaps for types 6-10)
+  function buildLayout(spread, type){
+    spread.querySelectorAll('.slot').forEach(s=>s.remove());
+
+    const dispW = (type===TYPES.COVER) ? DISPLAY.COVER_W : DISPLAY.SPREAD_W;
+    const dispH = DISPLAY.H;
+    const center = Math.round(dispW/2);
+    const bleedDisplay = (type===TYPES.COVER) ? Math.round(64*DISPLAY_SCALE) : Math.round(18*DISPLAY_SCALE);
+    const safeDisplay  = (type===TYPES.COVER) ? Math.round(84*DISPLAY_SCALE) : Math.round(36*DISPLAY_SCALE);
+
+    spread.style.setProperty('--cw', dispW+'px');
+    spread.style.setProperty('--ch', dispH+'px');
+    spread.style.setProperty('--center', center+'px');
+    spread.style.setProperty('--bleed', bleedDisplay+'px');
+    spread.style.setProperty('--safe',  safeDisplay+'px');
+
+    // base gaps
+    const baseInnerGap = 10;
+    const baseEdgeOffset = 10;
+
+    // decide whether to halve gaps: now halved for all types except cover and full-bleed background (T11)
+    const halved = (type !== TYPES.COVER && type !== TYPES.T11);
+    const innerGap = halved ? Math.round(baseInnerGap / 2) : baseInnerGap;
+    const edgeOffset = halved ? Math.round(baseEdgeOffset / 2) : baseEdgeOffset;
+
+    // For cover: left and right slots
+    if(type === TYPES.COVER){
+      const leftSlot = createSlot(0,0,center,dispH);
+      leftSlot.dataset.cover = 'left';
+      spread.appendChild(leftSlot);
+      const rightSlot = createSlot(center,0,dispW-center,dispH);
+      rightSlot.dataset.cover = 'right';
+      spread.appendChild(rightSlot);
+      return;
+    }
+
+    // Types 1-4 use innerGap and edgeOffset already
+    if(type === TYPES.T1){
+      const leftX = safeDisplay;
+      const leftRight = center - edgeOffset;
+      const leftW = Math.max(0, leftRight - leftX);
+      const topY = safeDisplay + edgeOffset;
+      const bottomY = dispH - safeDisplay - edgeOffset;
+      const availH = Math.max(0, bottomY - topY);
+      const topH = Math.floor((availH - innerGap) / 2);
+      const bottomH = Math.max(0, availH - innerGap - topH);
+      const topSlot = createSlot(leftX, topY, leftW, topH);
+      const bottomSlot = createSlot(leftX, topY + topH + innerGap, leftW, bottomH);
+      spread.appendChild(topSlot); spread.appendChild(bottomSlot);
+      const rightSlot = createSlot(center, 0, dispW - center, dispH);
+      spread.appendChild(rightSlot);
+      return;
+    }
+
+    if(type === TYPES.T2){
+      const rightX = dispW - safeDisplay;
+      const rightLeft = center + edgeOffset;
+      const rightW = Math.max(0, rightX - rightLeft);
+      const topY = safeDisplay + edgeOffset;
+      const bottomY = dispH - safeDisplay - edgeOffset;
+      const availH = Math.max(0, bottomY - topY);
+      const topH = Math.floor((availH - innerGap) / 2);
+      const bottomH = Math.max(0, availH - innerGap - topH);
+      const topSlot = createSlot(rightLeft, topY, rightW, topH);
+      const bottomSlot = createSlot(rightLeft, topY + topH + innerGap, rightW, bottomH);
+      spread.appendChild(topSlot); spread.appendChild(bottomSlot);
+      const leftSlot = createSlot(0, 0, center, dispH);
+      spread.appendChild(leftSlot);
+      return;
+    }
+
+    if(type === TYPES.T3){
+      const leftX = safeDisplay;
+      const leftRight = center - edgeOffset;
+      const leftW = Math.max(0, leftRight - leftX);
+      const innerAreaH = Math.max(0, dispH - 2*safeDisplay);
+      const totalH = Math.max(0, innerAreaH - innerGap);
+      const topH = Math.round(totalH * (696 / (696 + 298)));
+      const bottomH = Math.max(0, totalH - topH);
+      const leftTopY = safeDisplay;
+      const leftBottomY = leftTopY + topH + innerGap;
+      const leftTop = createSlot(leftX, leftTopY, leftW, topH);
+      const leftBottom = createSlot(leftX, leftBottomY, leftW, bottomH);
+      spread.appendChild(leftTop); spread.appendChild(leftBottom);
+
+      const rightLeft = center + edgeOffset;
+      const rightX = dispW - safeDisplay;
+      const rightW = Math.max(0, rightX - rightLeft);
+      const rightTop = createSlot(rightLeft, safeDisplay, rightW, bottomH);
+      const rightBottom = createSlot(rightLeft, safeDisplay + bottomH + innerGap, rightW, topH);
+      spread.appendChild(rightTop); spread.appendChild(rightBottom);
+      return;
+    }
+
+    if(type === TYPES.T4){
+      const leftX = safeDisplay;
+      const leftRight = center - edgeOffset;
+      const leftW = Math.max(0, leftRight - leftX);
+      const innerAreaH = Math.max(0, dispH - 2*safeDisplay);
+      const totalH = Math.max(0, innerAreaH - innerGap);
+      const bottomH = Math.round(totalH * (298 / (696 + 298)));
+      const topH = Math.max(0, totalH - bottomH);
+      const leftTopY = safeDisplay;
+      const leftBottomY = leftTopY + bottomH + innerGap;
+      const leftTop = createSlot(leftX, leftTopY, leftW, bottomH);
+      const leftBottom = createSlot(leftX, leftBottomY, leftW, topH);
+      spread.appendChild(leftTop); spread.appendChild(leftBottom);
+
+      const rightLeft = center + edgeOffset;
+      const rightX = dispW - safeDisplay;
+      const rightW = Math.max(0, rightX - rightLeft);
+      const rightTop = createSlot(rightLeft, safeDisplay, rightW, topH);
+      const rightBottom = createSlot(rightLeft, safeDisplay + topH + innerGap, rightW, bottomH);
+      spread.appendChild(rightTop); spread.appendChild(rightBottom);
+      return;
+    }
+
+    // NEW types 5..11
+
+    if(type === TYPES.T5){
+      // Two vertical left, two vertical right. Offsets inside safe area (edgeOffset/innerGap may be halved)
+      const leftX = safeDisplay;
+      const leftRight = center - edgeOffset;
+      const leftW = Math.max(0, leftRight - leftX);
+      const topY = safeDisplay + edgeOffset;
+      const bottomY = dispH - safeDisplay - edgeOffset;
+      const availH = Math.max(0, bottomY - topY);
+      const topH = Math.floor((availH - innerGap) / 2);
+      const bottomH = Math.max(0, availH - innerGap - topH);
+      const leftTop = createSlot(leftX, topY, leftW, topH);
+      const leftBottom = createSlot(leftX, topY + topH + innerGap, leftW, bottomH);
+      spread.appendChild(leftTop); spread.appendChild(leftBottom);
+
+      const rightLeft = center + edgeOffset;
+      const rightX = dispW - safeDisplay;
+      const rightW = Math.max(0, rightX - rightLeft);
+      const rightTop = createSlot(rightLeft, topY, rightW, topH);
+      const rightBottom = createSlot(rightLeft, topY + topH + innerGap, rightW, bottomH);
+      spread.appendChild(rightTop); spread.appendChild(rightBottom);
+      return;
+    }
+
+    if(type === TYPES.T6){
+      // Five images: top two, bottom three. Located from green lines.
+      // Top gap 20, bottom gaps 10, vertical gap 10.
+      let topGap = 20;
+      let botGap = 10;
+      let verticalGap = 10;
+      if(halved){ topGap = Math.round(topGap/2); botGap = Math.round(botGap/2); verticalGap = Math.round(verticalGap/2); }
+
+      const leftX = safeDisplay;
+      const rightX = dispW - safeDisplay;
+      const totalW = Math.max(0, rightX - leftX);
+
+      const innerAreaH = Math.max(0, dispH - 2*safeDisplay);
+      const topH = Math.floor((innerAreaH - verticalGap) / 2);
+      const bottomH = Math.max(0, innerAreaH - verticalGap - topH);
+
+      // top two: make widths sum exactly to totalW
+      const topW1 = Math.floor((totalW - topGap) / 2);
+      const topW2 = Math.max(0, totalW - topGap - topW1);
+      const topLeft = createSlot(leftX, safeDisplay, topW1, topH);
+      const topRight = createSlot(leftX + topW1 + topGap, safeDisplay, topW2, topH);
+      spread.appendChild(topLeft); spread.appendChild(topRight);
+
+      // bottom three: ensure rightmost reaches green line exactly by adding remainder to last slot
+      const baseBotW = Math.floor((totalW - 2*botGap) / 3);
+      const rem = (totalW - 2*botGap) - (3 * baseBotW);
+      const botW1 = baseBotW;
+      const botW2 = baseBotW;
+      const botW3 = Math.max(0, baseBotW + rem);
+      const botY = safeDisplay + topH + verticalGap;
+      const bot1 = createSlot(leftX, botY, botW1, bottomH);
+      const bot2 = createSlot(leftX + botW1 + botGap, botY, botW2, bottomH);
+      const bot3Left = leftX + botW1 + botGap + botW2 + botGap;
+      const bot3 = createSlot(bot3Left, botY, Math.max(0, rightX - bot3Left), bottomH);
+      spread.appendChild(bot1); spread.appendChild(bot2); spread.appendChild(bot3);
+      return;
+    }
+
+    if(type === TYPES.T7){
+      // Two horizontal images stacked, vertical gap 10px -> halved to 5px when halved
+      let gap = 10;
+      if(halved) gap = Math.round(gap/2);
+      const topH = Math.floor((dispH - gap) / 2);
+      const bottomH = Math.max(0, dispH - gap - topH);
+      const topSlot = createSlot(0, 0, dispW, topH);
+      const bottomSlot = createSlot(0, topH + gap, dispW, bottomH);
+      spread.appendChild(topSlot); spread.appendChild(bottomSlot);
+      return;
+    }
+
+    if(type === TYPES.T8){
+      // Two vertical side-by-side, gap 20px -> halved 10px when halved, images start from edges (full height)
+      let gap = 20;
+      if(halved) gap = Math.round(gap/2);
+      const leftW = Math.floor((dispW - gap) / 2);
+      const rightW = Math.max(0, dispW - gap - leftW);
+      const leftSlot = createSlot(0, 0, leftW, dispH);
+      const rightSlot = createSlot(leftW + gap, 0, rightW, dispH);
+      spread.appendChild(leftSlot); spread.appendChild(rightSlot);
+      return;
+    }
+
+    if(type === TYPES.T9){
+      // Three: two top (within safe), one bottom full-width extending to bottom edge.
+      let topGap = 20;
+      let verticalGap = 10;
+      if(halved){ topGap = Math.round(topGap/2); verticalGap = Math.round(verticalGap/2); }
+
+      const leftX = safeDisplay;
+      const rightX = dispW - safeDisplay;
+      const totalW = Math.max(0, rightX - leftX);
+
+      const innerAreaH = Math.max(0, dispH - 2*safeDisplay);
+      const topH = Math.floor((innerAreaH - verticalGap) / 2);
+
+      const topW = Math.max(0, Math.floor((totalW - topGap) / 2));
+      const topLeft = createSlot(leftX, safeDisplay, topW, topH);
+      const topRight = createSlot(leftX + topW + topGap, safeDisplay, topW, topH);
+      spread.appendChild(topLeft); spread.appendChild(topRight);
+
+      const bottomY = safeDisplay + topH + verticalGap;
+      const bottomH = Math.max(0, dispH - bottomY); // extend to bottom edge
+      const bottomSlot = createSlot(0, bottomY, dispW, bottomH);
+      spread.appendChild(bottomSlot);
+      return;
+    }
+
+    if(type === TYPES.T10){
+      // Mirrored vertically of T9: one full-width top extending to top edge, two bottom within safe.
+      let topGap = 20;
+      let verticalGap = 10;
+      if(halved){ topGap = Math.round(topGap/2); verticalGap = Math.round(verticalGap/2); }
+
+      const leftX = safeDisplay;
+      const rightX = dispW - safeDisplay;
+      const totalW = Math.max(0, rightX - leftX);
+
+      const innerAreaH = Math.max(0, dispH - 2*safeDisplay);
+      const bottomH = Math.floor((innerAreaH - verticalGap) / 2);
+      const topH = Math.max(0, innerAreaH - verticalGap - bottomH);
+
+      // top full-width should reach top edge (we extend to top edge)
+      const topSlot = createSlot(0, 0, dispW, safeDisplay + topH);
+      spread.appendChild(topSlot);
+
+      const botY = safeDisplay + topH + verticalGap;
+      const botW = Math.max(0, Math.floor((totalW - topGap) / 2));
+      const botLeft = createSlot(leftX, botY, botW, bottomH);
+      const botRight = createSlot(leftX + botW + topGap, botY, botW, bottomH);
+      spread.appendChild(botLeft); spread.appendChild(botRight);
+      return;
+    }
+
+    if(type === TYPES.T11){
+      // Full bleed background image from edges
+      const slot = createSlot(0,0,dispW,dispH);
+      spread.appendChild(slot);
+      return;
+    }
+  }
+    // Функция Галереи
+    function addSingleFileToGallery(file, preferFront = false, thumbUrl = null) {
+        const id = 'g' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+
+        let preview;
+        if (thumbUrl) {
+            preview = thumbUrl;                     // используем лёгкий thumbnail
+        } else {
+            preview = URL.createObjectURL(file);    // fallback (если что-то пошло не так)
+            previewURLs.add(preview);               // добавляем в набор для последующей очистки
+        }
+
+        const item = { id, file, preview };
+        const currentItems = state.days[state.currentDay].items;
+        if (preferFront) currentItems.unshift(item);
+        else currentItems.push(item);
+
+        renderGalleryDay(state.currentDay);
+        return item;
+    }
+
+    function insertFileToGallery(file, dayIdx, posIdx) {
+        if (!file) return;
+        const id = 'g' + Date.now() + Math.random();
+        const preview = URL.createObjectURL(file);
+        const item = { id, file, preview };
+        if (dayIdx >= 0 && dayIdx < state.days.length && posIdx >= 0) {
+            const day = state.days[dayIdx];
+            day.items.splice(posIdx, 0, item);
+            if (state.currentDay === dayIdx) renderGalleryDay(dayIdx);
+            return;
+        }
+        // Fallback: добавляем в конец текущего дня
+        addSingleFileToGallery(file);
+    }
+  
+function createGalleryItemDOM(item, preferFront=false){
+    const gi = el('div','gallery-item');
+    gi.dataset.id = item.id;
+    const img = el('img'); img.src = item.preview; img.className='gallery-thumb'; img.loading = 'lazy';
+    img.alt = item.file && item.file.name ? item.file.name : '';
+    const wrapImg = el('div','gallery-thumb-wrap');
+    wrapImg.appendChild(img);
+    // delete button (top-right)
+    const del = el('button','gdelete'); del.innerHTML = '✖';
+    del.addEventListener('click', (ev)=>{ ev.stopPropagation(); removeGalleryItemById(item.id); });
+    wrapImg.appendChild(del);
+    // download button (bottom-right)
+    const down = el('a','gdownload'); down.innerHTML = '⬇';
+    down.href = item.preview || '#';
+    down.setAttribute('download', item.file && item.file.name ? item.file.name : 'image');
+    down.addEventListener('click', (ev)=>{ ev.stopPropagation(); /* allow default download */ });
+    wrapImg.appendChild(down);
+    gi.appendChild(wrapImg);
+    // filename under thumbnail
+    const nameEl = el('div','gname'); nameEl.textContent = item.file && item.file.name ? item.file.name : '';
+    gi.appendChild(nameEl);
+
+    gi.draggable = true;
+    gi.addEventListener('dragstart', (e)=>{
+      e.dataTransfer.setData('text/plain', 'gallery:' + item.id);
+      e.dataTransfer.effectAllowed='copyMove';
+      try{ e.dataTransfer.setDragImage(img, img.width/2 || 40, img.height/2 || 30);}catch(e){}
+    });
+    img.addEventListener('click', () => {
+        const originalUrl = URL.createObjectURL(item.file);  // ← оригинал вместо preview
+        window._openGalleryImage(originalUrl, img.alt);
+
+        // Очистка после закрытия (чтобы не утечка памяти)
+        const modal = document.getElementById('imageModal');
+        const modalClose = document.getElementById('modalClose');
+
+        const cleanup = () => {
+            URL.revokeObjectURL(originalUrl);
+            modal.removeEventListener('click', cleanup);
+            modalClose.removeEventListener('click', cleanup);
+        };
+        modal.addEventListener('click', cleanup, { once: true });
+        modalClose.addEventListener('click', cleanup, { once: true });
+    });
+    return gi;
+  }
+
+  function removeGalleryItemById(id){
+    let found = false;
+    state.days.forEach(day => {
+      const idx = day.items.findIndex(g=>g.id===id);
+      if(idx!==-1){
+        const item = day.items.splice(idx,1)[0];
+        try{ URL.revokeObjectURL(item.preview); }catch(e){}
+        found = true;
+      }
+    });
+    if(found) renderGalleryDay(state.currentDay);
+  }
+
+  function getGalleryItemById(id){
+    for(const day of state.days){
+      const item = day.items.find(g=>g.id===id);
+      if(item) return item;
+    }
+    return null;
+  }
+
+    function findGalleryItemWithIndices(id) {
+        for (let d = 0; d < state.days.length; d++) {
+            const day = state.days[d];
+            const idx = day.items.findIndex(g => g.id === id);
+            if (idx !== -1) return { item: day.items[idx], dayIdx: d, itemIdx: idx };
+        }
+        return null;
+    }
+
+    async function handleFilesFromUploader(files) {
+        const arr = Array.from(files || []);
+        for (const f of arr) {
+            if (f.type.startsWith('image/')) {
+                try {
+                    const thumbUrl = await generateThumbnail(f, 180, 0.78);
+                    addSingleFileToGallery(f, false, thumbUrl);  // ← передаём thumbnail
+                } catch (err) {
+                    console.warn('Не удалось создать thumbnail для', f.name, err);
+                    // fallback — можно добавить placeholder или пропустить
+                    addSingleFileToGallery(f, false, null);     // или без preview
+                }
+            }
+        }
+    }
+
+  // Render current day
+  function renderGalleryDay(dayIndex) {
+    galleryListEl.innerHTML = '';  // Очищаем DOM
+    const currentDay = state.days[dayIndex];
+    if(!currentDay) return;
+    currentDay.items.forEach(item => {
+      const gi = createGalleryItemDOM(item, false);
+        galleryListEl.appendChild(gi);
+        // Обработчик клика по элементам галереи
+        galleryListEl.querySelectorAll('.gallery-item').forEach((el, index) => {
+            el.addEventListener('click', e => {
+                if (e.target.closest('.gdelete') || e.target.closest('.gdownload')) return;
+
+                const item = state.days[state.currentDay]?.items[index];
+                if (!item?.file) return;
+
+                const originalUrl = URL.createObjectURL(item.file);
+                openModal(originalUrl, item.file.name || 'Фото');
+
+                // Очистка после закрытия модального окна
+                const cleanup = () => {
+                    URL.revokeObjectURL(originalUrl);
+                    modal.removeEventListener('click', cleanup);
+                    modalClose.removeEventListener('click', cleanup);
+                };
+                modal.addEventListener('click', cleanup, { once: true });
+                modalClose.addEventListener('click', cleanup, { once: true });
+            });
+        });
+    });
+    // Обновляем индикатор дней
+    updateDayPager();
+  }
+
+  // Update day pager UI
+  function updateDayPager() {
+    const pager = document.getElementById('gallery-pager');
+    if (pager) {
+      pager.innerHTML = `
+        <div class="row">
+          <span>${state.days[state.currentDay].name}</span>
+          <button id="prevDay" class="btn">‹</button>
+          <button id="nextDay" class="btn">›</button>
+        </div>
+        <div class="row">
+          <button id="addDay" class="btn">День +</button>
+          <button id="removeDay" class="btn">День -</button>
+        </div>
+        <div class="row info">Всего дней: ${state.days.length}</div>
+      `;
+      document.getElementById('prevDay').disabled = (state.currentDay === 0);
+      document.getElementById('nextDay').disabled = (state.currentDay >= state.days.length - 1);
+      document.getElementById('removeDay').disabled = (state.days.length <= 1);
+    }
+  }
+
+  // Add new day
+  function addNewDay() {
+    const newDayNum = state.days.length + 1;
+    state.days.push({ name: `День ${newDayNum}`, items: [] });
+    state.currentDay = state.days.length - 1;
+    daysCountInput.value = state.days.length;
+    renderGalleryDay(state.currentDay);
+  }
+
+  // Remove current day
+  function removeCurrentDay() {
+    if(state.days.length <= 1) return alert('Нельзя удалить последний день');
+    const day = state.days[state.currentDay];
+    const hasPhotos = day.items.length > 0;
+    if(confirm(`Удалить ${day.name}${hasPhotos ? ' и все изображения в нём' : ''}?`)){
+      // Delete photos
+      day.items.forEach(item => { try{ URL.revokeObjectURL(item.preview); }catch(e){} });
+        state.days.splice(state.currentDay, 1);
+        // Очистка thumbnails удалённого дня
+        const removedDay = state.days[state.currentDay]; // если splice уже прошёл — возьми перед splice
+        if (removedDay) {
+            removedDay.items.forEach(item => {
+                if (item.preview && item.preview.startsWith('blob:')) {
+                    URL.revokeObjectURL(item.preview);
+                    previewURLs.delete(item.preview);
+                }
+            });
+        }
+      if(state.currentDay >= state.days.length) state.currentDay = state.days.length - 1;
+      daysCountInput.value = state.days.length;
+      renderGalleryDay(state.currentDay);
+    }
+  }
+
+  // Handle days count change
+  function handleDaysCountChange() {
+    let targetCount = parseInt(daysCountInput.value) || 1;
+    if(targetCount < 1) { targetCount = 1; daysCountInput.value = 1; }
+    const currentCount = state.days.length;
+    if(targetCount > currentCount) {
+      for(let i = currentCount + 1; i <= targetCount; i++) {
+        state.days.push({ name: `День ${i}`, items: [] });
+      }
+    } else if(targetCount < currentCount) {
+      for(let i = currentCount; i > targetCount; i--) {
+        const lastDay = state.days[state.days.length - 1];
+        const hasPhotos = lastDay.items.length > 0;
+        if(!confirm(`Удалить ${lastDay.name}${hasPhotos ? ' и все изображения в нём' : ''}?`)) {
+          daysCountInput.value = currentCount;
+          return;
+        }
+        // Delete photos
+        lastDay.items.forEach(item => { try{ URL.revokeObjectURL(item.preview); }catch(e){} });
+        state.days.pop();
+      }
+      if(state.currentDay >= state.days.length) state.currentDay = state.days.length - 1;
+    }
+    daysCountInput.value = state.days.length;
+    renderGalleryDay(state.currentDay);
+  }
+
+  // Add spread (default sequencing if defaultType not provided)
+  function addSpreadReal(defaultType){
+    const wrap = el('div','spread-wrap');
+    const spread = el('div','spread');
+    spread.innerHTML = '<div class="line-red"></div><div class="line-green"></div><div class="line-center"></div>';
+    
+    const footer = el('div','footer');
+    footer.innerHTML = `<div class="left">Разворот <strong class="num"></strong> — <span class="cap"></span></div>
+      <div class="right"><label class="muted">Тип:</label>
+        <select class="sel">
+          <option>${TYPES.COVER}</option>
+          <option>${TYPES.T1}</option>
+          <option>${TYPES.T2}</option>
+          <option>${TYPES.T3}</option>
+          <option>${TYPES.T4}</option>
+          <option>${TYPES.T5}</option>
+          <option>${TYPES.T6}</option>
+          <option>${TYPES.T7}</option>
+          <option>${TYPES.T8}</option>
+          <option>${TYPES.T9}</option>
+          <option>${TYPES.T10}</option>
+          <option>${TYPES.T11}</option>
+        </select></div>`;
+    
+    wrap.appendChild(spread);
+    wrap.appendChild(footer);
+
+    spreadsEl.appendChild(wrap);
+
+    const select = footer.querySelector('.sel');
+    select.value = defaultType || TYPES.T2;
+    select.dataset.prev = select.value;
+    buildLayout(spread, select.value);
+
+    select.addEventListener('change', (e)=>{
+      const newType = e.target.value;
+      if(spread.querySelector('.slot-img[src]')){
+        if(!confirm('Сменить тип? Все изображения в этом развороте будут удалены.')){ e.target.value = select.dataset.prev; return; }
+        spread.querySelectorAll('.slot').forEach(s=>{
+          const img = s.querySelector('.slot-img');
+          if(img) img.removeAttribute('src');
+          if(s._origFile){ addSingleFileToGallery(s._origFile); s._origFile = null; }
+          const hint = s.querySelector('.hint'); if(hint) hint.style.display='grid';
+          if(s._st) s._st.has=false;
+        });
+      }
+      buildLayout(spread, newType);
+      select.dataset.prev = newType;
+    });
+
+    wrap.addEventListener('click', ()=>{
+      [...spreadsEl.children].forEach(w=>w.classList.remove('active'));
+      wrap.classList.add('active');
+      centerActive(wrap);
+    });
+
+    state.count++;
+    renumber();
+  }
+
+  function removeActive(){
+    const activeIndex = [...spreadsEl.children].findIndex(w=>w.classList.contains('active'));
+    if(activeIndex<0) return;
+    if(spreadsEl.children.length<=1) return alert('Нельзя удалить последний разворот');
+    const wrap = spreadsEl.children[activeIndex];
+    const spread = wrap.querySelector('.spread');
+    spread.querySelectorAll('.slot').forEach(s=>{
+      if(s._origFile) addSingleFileToGallery(s._origFile);
+    });
+    spreadsEl.removeChild(spreadsEl.children[activeIndex]);
+    renumber();
+    const newIndex = Math.max(0, activeIndex-1);
+    [...spreadsEl.children].forEach(w=>w.classList.remove('active'));
+    spreadsEl.children[newIndex].classList.add('active');
+    centerActive(spreadsEl.children[newIndex]);
+  }
+
+    function clearActive() {
+        const active = spreadsEl.querySelector('.spread-wrap.active');
+        if (!active) return;
+        const spread = active.querySelector('.spread');
+        if (confirm('Очистить все фото на выбранном развороте?')) {
+            spread.querySelectorAll('.slot').forEach(s => {
+                const img = s.querySelector('.slot-img');
+                if (img) img.removeAttribute('src');
+                const hint = s.querySelector('.hint');
+                if (hint) hint.style.display = 'grid';
+                const fileToReturn = s._origFile;
+                const origDay = s._origDay;
+                const origIndex = s._origIndex;
+                s._origFile = null;
+                if (s._st) s._st.has = false;
+                delete s._origDay;
+                delete s._origIndex;
+                if (fileToReturn) {
+                    insertFileToGallery(fileToReturn, origDay, origIndex);
+                }
+            });
+        }
+    }
+
+async function createOverviewImage() {
+    try {
+        const wraps = [...spreadsEl.children];
+        if (wraps.length === 0) {
+            alert('Нет разворотов для предпросмотра');
+            return;
+        }
+
+        // === НАСТРОЙКИ ПРЕВЬЮ ===
+        const PREVIEW_QUALITY_SCALE = 0.25; // 25% от оригинального размера
+        const GAP = 40;
+        const perRow = 3;
+
+        // Выбор формата экспорта
+        const sel = document.getElementById('exportScale').value;
+        const mult = EXPORT_MULT[sel] || 4;
+        const includeGuides = true;
+
+        const previewCanvases = [];
+
+        try {
+            for (let wrapIdx = 0; wrapIdx < wraps.length; wrapIdx++) {
+                const wrap = wraps[wrapIdx];
+                const spreadElement = wrap.querySelector('.spread');
+                const type = wrap.querySelector('.sel').value;
+
+                // === РАЗМЕРЫ РАЗВОРОТА ===
+                const logicalW = (type === TYPES.COVER) ? LOGICAL.COVER_W : LOGICAL.SPREAD_W;
+                const logicalH = LOGICAL.H;
+                
+                // Размер для превью (уже масштабированный)
+                const PREVIEW_W = Math.round(logicalW * mult * PREVIEW_QUALITY_SCALE);
+                const PREVIEW_H = Math.round(logicalH * mult * PREVIEW_QUALITY_SCALE);
+                
+                // === ИСПРАВЛЕНИЕ: ЕДИНЫЙ КОЭФФИЦИЕНТ МАСШТАБИРОВАНИЯ ===
+                // Используем display scale для координат слотов
+                const dispW = parseFloat(getComputedStyle(spreadElement).getPropertyValue('--cw')) || spreadElement.clientWidth || (logicalW * DISPLAY_SCALE);
+                const dispH = parseFloat(getComputedStyle(spreadElement).getPropertyValue('--ch')) || spreadElement.clientHeight || (logicalH * DISPLAY_SCALE);
+                
+                // Коэффициент от display к превью
+                const sx = PREVIEW_W / dispW;
+                const sy = PREVIEW_H / dispH;
+
+                const previewCanvas = document.createElement('canvas');
+                previewCanvas.width = PREVIEW_W;
+                previewCanvas.height = PREVIEW_H;
+                const ctx = previewCanvas.getContext('2d');
+
+                // Белый фон
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, PREVIEW_W, PREVIEW_H);
+
+                const slots = spreadElement.querySelectorAll('.slot');
+                const OVERDRAW = Math.max(2, Math.round(2 * Math.max(sx, sy)));
+
+                // === ОТРИСОВКА СЛОТОВ И ИЗОБРАЖЕНИЙ ===
+                for (const slot of slots) {
+                    const relLeft = slot.offsetLeft;
+                    const relTop = slot.offsetTop;
+                    const relW = slot.clientWidth;
+                    const relH = slot.clientHeight;
+                    
+                    const previewX = Math.round(relLeft * sx);
+                    const previewY = Math.round(relTop * sy);
+                    const previewW = Math.round(relW * sx);
+                    const previewH = Math.round(relH * sy);
+
+                    // Фон слота
+                    ctx.fillStyle = '#f2f2f2';
+                    ctx.fillRect(previewX, previewY, previewW, previewH);
+
+                    const imgEl = slot.querySelector('.slot-img');
+                    if (!imgEl || !imgEl.src) continue;
+
+                    const file = slot._origFile || null;
+                    const srcURL = file ? URL.createObjectURL(file) : imgEl.src;
+                    
+                    try {
+                        const image = await loadImageForExport(srcURL);
+                        const st = slot._st || { 
+                            iw: image.naturalWidth || image.width, 
+                            ih: image.naturalHeight || image.height, 
+                            fit: 1, 
+                            userScale: 1, 
+                            tx: 0, 
+                            ty: 0 
+                        };
+
+                        const dispWimg = st.iw * st.fit * st.userScale;
+                        const dispHimg = st.ih * st.fit * st.userScale;
+
+                        const slotCenterX = relLeft + relW / 2;
+                        const slotCenterY = relTop + relH / 2;
+                        const imgLeft = slotCenterX - dispWimg / 2 + st.tx;
+                        const imgTop = slotCenterY - dispHimg / 2 + st.ty;
+
+                        const offXInDisp = relLeft - imgLeft;
+                        const offYInDisp = relTop - imgTop;
+
+                        const dispToNatX = st.iw / dispWimg;
+                        const dispToNatY = st.ih / dispHimg;
+
+                        let sx0 = Math.round(offXInDisp * dispToNatX);
+                        let sy0 = Math.round(offYInDisp * dispToNatY);
+                        let sw0 = Math.round(relW * dispToNatX);
+                        let sh0 = Math.round(relH * dispToNatY);
+
+                        // Корректировка границ
+                        sx0 = Math.max(0, sx0);
+                        sy0 = Math.max(0, sy0);
+                        const natW = image.naturalWidth || image.width;
+                        const natH = image.naturalHeight || image.height;
+                        if (sx0 + sw0 > natW) sw0 = natW - sx0;
+                        if (sy0 + sh0 > natH) sh0 = natH - sy0;
+                        sw0 = Math.max(1, sw0);
+                        sh0 = Math.max(1, sh0);
+
+                        const drawW = Math.max(1, Math.min(PREVIEW_W - previewX, previewW + OVERDRAW));
+                        const drawH = Math.max(1, Math.min(PREVIEW_H - previewY, previewH + OVERDRAW));
+
+                        // Отрисовка изображения
+                        ctx.drawImage(image, sx0, sy0, sw0, sh0, previewX, previewY, drawW, drawH);
+
+                        // Рамка слота
+                        if (includeGuides) {
+                            ctx.save();
+                            ctx.strokeStyle = '#bbbbbb';
+                            ctx.lineWidth = Math.max(1, Math.round(Math.max(sx, sy) * 0.6));
+                            ctx.setLineDash([6, 4]);
+                            ctx.strokeRect(previewX, previewY, Math.max(0, previewW), Math.max(0, previewH));
+                            ctx.restore();
+                        }
+                    } catch (err) {
+                        console.warn('Ошибка при отрисовке изображения:', err);
+                    } finally {
+                        if (file) URL.revokeObjectURL(srcURL);
+                    }
+                }
+
+                // === ИСПРАВЛЕНИЕ: ЛИНИИ ГАЙДОВ НА ОСНОВЕ DISPLAY РАЗМЕРОВ ===
+                if (includeGuides) {
+                    // Получаем CSS переменные для линий
+                    const bleedDisplay = parseFloat(getComputedStyle(spreadElement).getPropertyValue('--bleed')) || 0;
+                    const safeDisplay = parseFloat(getComputedStyle(spreadElement).getPropertyValue('--safe')) || 0;
+                    const centerDisplay = parseFloat(getComputedStyle(spreadElement).getPropertyValue('--center')) || 0;
+                    
+                    // Конвертируем display координаты в preview координаты
+                    const bleedPreview = Math.round(bleedDisplay * sx);
+                    const safePreview = Math.round(safeDisplay * sx);
+                    const centerPreview = Math.round(centerDisplay * sx);
+                    
+                    const lineW = Math.max(1, Math.round(Math.max(sx, sy)));
+
+                    // Красная линия (bleed)
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = lineW;
+                    ctx.strokeRect(
+                        bleedPreview, 
+                        bleedPreview, 
+                        PREVIEW_W - 2 * bleedPreview, 
+                        PREVIEW_H - 2 * bleedPreview
+                    );
+
+                    // Зеленая линия (safe)
+                    ctx.strokeStyle = '#27ae60';
+                    ctx.lineWidth = lineW;
+                    ctx.strokeRect(
+                        safePreview, 
+                        safePreview, 
+                        PREVIEW_W - 2 * safePreview, 
+                        PREVIEW_H - 2 * safePreview
+                    );
+
+                    // Синяя линия (center)
+                    ctx.fillStyle = '#2196f3';
+                    ctx.fillRect(centerPreview, 0, lineW, PREVIEW_H);
+                }
+
+                // === ТЕКСТ ОБЛОЖКИ ===
+                if (type === TYPES.COVER) {
+                    const textElements = spreadElement.querySelectorAll('.cover-text');
+                    for (const textEl of textElements) {
+                        const text = textEl.textContent;
+                        const fontFamily = textEl.style.fontFamily || 'Arial';
+                        const fontSize = parseInt(textEl.style.fontSize) || 48;
+                        const color = textEl.style.color || '#ffffff';
+                        
+                        const textLeft = parseFloat(textEl.style.left) || 0;
+                        const textTop = parseFloat(textEl.style.top) || 0;
+                        
+                        const previewTextX = Math.round(textLeft * sx);
+                        const previewTextY = Math.round(textTop * sy);
+                        const previewFontSize = Math.round(fontSize * sx);
+                        
+                        if (previewFontSize > 2) {
+                            ctx.save();
+                            ctx.font = `${previewFontSize}px ${fontFamily}`;
+                            ctx.fillStyle = color;
+                            ctx.textBaseline = 'top';
+                            ctx.textAlign = 'left';
+                            
+                            // Тень
+                            ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+                            ctx.shadowBlur = Math.round(4 * sx);
+                            ctx.shadowOffsetX = Math.round(2 * sx);
+                            ctx.shadowOffsetY = Math.round(2 * sx);
+                            
+                            ctx.fillText(text, previewTextX, previewTextY);
+                            ctx.restore();
+                        }
+                    }
+                }
+
+                previewCanvases.push(previewCanvas);
+            }
+        } catch (err) {
+            console.error('Ошибка при создании превью:', err);
+            throw err;
+        }
+
+        // === СОЗДАНИЕ ЕДИНОГО ИЗОБРАЖЕНИЯ ===
+        if (previewCanvases.length === 0) {
+            alert('Не удалось создать превью');
+            return;
+        }
+
+        const rows = [];
+        for (let i = 0; i < previewCanvases.length; i += perRow) {
+            rows.push(previewCanvases.slice(i, i + perRow));
+        }
+
+        const rowWidths = rows.map(row =>
+            GAP + row.reduce((sum, c) => sum + c.width + GAP, 0) - GAP
+        );
+        const maxRowWidth = Math.max(...rowWidths, 1200);
+
+        const tileHeight = previewCanvases[0].height;
+        const totalHeight = GAP + rows.length * (tileHeight + GAP) - GAP;
+
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = maxRowWidth;
+        finalCanvas.height = totalHeight;
+        const ctxFinal = finalCanvas.getContext('2d');
+
+        // Фон
+        ctxFinal.fillStyle = '#f8f8f8';
+        ctxFinal.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+        // Расположение миниатюр
+        let y = GAP;
+        for (const row of rows) {
+            const rowW = row.reduce((s, c) => s + c.width, 0) + GAP * (row.length - 1);
+            let x = GAP + (maxRowWidth - rowW) / 2;
+
+            for (const canvas of row) {
+                ctxFinal.drawImage(canvas, x, y);
+                x += canvas.width + GAP;
+            }
+            y += tileHeight + GAP;
+        }
+
+        // === СОХРАНЕНИЕ ===
+        const blob = await new Promise(r => finalCanvas.toBlob(r, 'image/jpeg', 0.92));
+        
+        // Имя файла
+        const clean = (str) => str.replace(/[\/\\:*?"<>|]/g, '_');
+        const title = clean(bookTitleInput.value.trim()) || 'Без названия';
+        const expedition = clean(expeditionInput.value.trim()) || 'Без экспедиции';
+        const daysCount = daysCountInput.value;
+        
+        let daysText;
+        if (daysCount === '1') daysText = '1день';
+        else if (daysCount === '2') daysText = '2дня';
+        else if (daysCount === '3') daysText = '3дня';
+        else if (daysCount === '4') daysText = '4дня';
+        else daysText = `${daysCount}дней`;
+        
+        const timestamp = tsName();
+        const fname = `Превью_${daysText}_${title}_${expedition}_${timestamp}.jpg`;
+
+        saveAs(blob, fname);
+
+        // Очистка
+        previewCanvases.forEach(c => c.remove());
+        finalCanvas.remove();
+
+    } catch (err) {
+        console.error('Ошибка создания превью:', err);
+        alert('Не удалось сформировать превью:\n' + (err.message || err));
+    }
+}
+
+  // draw a single spread into a canvas sized OUT_W x OUT_H (similar to export logic)
+  async function drawSpreadToCanvas(spread, type, OUT_W, OUT_H, includeGuides){
+    const canvas = document.createElement('canvas'); canvas.width = OUT_W; canvas.height = OUT_H;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,OUT_W,OUT_H);
+
+    const logicalW = (type===TYPES.COVER)?LOGICAL.COVER_W:LOGICAL.SPREAD_W;
+    const logicalH = LOGICAL.H;
+    const dispW = parseFloat(getComputedStyle(spread).getPropertyValue('--cw')) || spread.clientWidth || (logicalW*DISPLAY_SCALE);
+    const dispH = parseFloat(getComputedStyle(spread).getPropertyValue('--ch')) || spread.clientHeight || (logicalH*DISPLAY_SCALE);
+    const sx = OUT_W / dispW; const sy = OUT_H / dispH;
+
+    const OVERDRAW = Math.max(2, Math.round(2 * Math.max(sx, sy))); // ensure small overdraw in preview
+
+    let coverOriginalFile = null;
+      const slots = spread.querySelectorAll('.slot');
+    for(const slot of slots){
+      const relLeft = slot.offsetLeft, relTop = slot.offsetTop;
+      const relW = slot.clientWidth, relH = slot.clientHeight;
+      const bigX = Math.round(relLeft * sx), bigY = Math.round(relTop * sy),
+            bigW = Math.round(relW * sx), bigH = Math.round(relH * sy);
+
+      // slot background
+      ctx.fillStyle = '#f2f2f2'; ctx.fillRect(bigX, bigY, bigW, bigH);
+
+      const imgEl = slot.querySelector('.slot-img');
+      if(!imgEl || !imgEl.src) continue;
+
+      const file = slot._origFile || null;
+      const srcURL = file ? URL.createObjectURL(file) : imgEl.src;
+      try{
+        const image = await loadImageForExport(srcURL);
+        const st = slot._st || { iw:image.naturalWidth||image.width, ih:image.naturalHeight||image.height, fit:1, userScale:1, tx:0, ty:0 };
+
+        const dispWimg = st.iw * st.fit * st.userScale;
+        const dispHimg = st.ih * st.fit * st.userScale;
+
+        const slotCenterX = relLeft + relW/2;
+        const slotCenterY = relTop + relH/2;
+        const imgLeft = slotCenterX - dispWimg/2 + st.tx;
+        const imgTop  = slotCenterY - dispHimg/2 + st.ty;
+
+        const offXInDisp = relLeft - imgLeft;
+        const offYInDisp = relTop  - imgTop;
+
+        const dispToNatX = st.iw / dispWimg;
+        const dispToNatY = st.ih / dispHimg;
+
+        let sx0 = Math.round(offXInDisp * dispToNatX);
+        let sy0 = Math.round(offYInDisp * dispToNatY);
+        let sw0 = Math.round(relW * dispToNatX);
+        let sh0 = Math.round(relH * dispToNatY);
+
+        if(sx0 < 0){ sw0 += sx0; sx0 = 0; }
+        if(sy0 < 0){ sh0 += sy0; sy0 = 0; }
+        const natW = image.naturalWidth || image.width; const natH = image.naturalHeight || image.height;
+        if(sx0 + sw0 > natW) sw0 = natW - sx0;
+        if(sy0 + sh0 > natH) sh0 = natH - sy0;
+        sw0 = Math.max(1, sw0); sh0 = Math.max(1, sh0);
+
+        // compute overdraw on destination; clamp to canvas bounds so we never draw outside
+        const drawW = Math.max(1, Math.min(OUT_W - bigX, bigW + OVERDRAW));
+        const drawH = Math.max(1, Math.min(OUT_H - bigY, bigH + OVERDRAW));
+
+        ctx.drawImage(image, sx0, sy0, sw0, sh0, bigX, bigY, drawW, drawH);
+
+        // draw slot outline if guides enabled
+        if(includeGuides){
+          ctx.save();
+          ctx.strokeStyle = '#bbbbbb';
+          ctx.lineWidth = Math.max(1, Math.round(Math.max(sx, sy) * 0.6));
+          ctx.setLineDash([6,4]);
+          ctx.strokeRect(bigX, bigY, Math.max(0, bigW), Math.max(0,bigH));
+          ctx.restore();
+        }
+      }catch(err){ console.warn('Preview draw err', err); }
+      finally { if(file) URL.revokeObjectURL(srcURL); }
+    }
+
+    // guides: red/green/center (always include for preview)
+    if(includeGuides){
+      const bleedLogical = (type===TYPES.COVER)?64:18;
+      const safeLogical  = (type===TYPES.COVER)?84:36;
+      const bleedExport  = Math.round(bleedLogical * Math.max(sx, sy));
+      const safeExport   = Math.round(safeLogical * Math.max(sx, sy));
+      const centerExport = Math.round((logicalW/2) * Math.max(sx, sy));
+      const lineW = Math.max(1, Math.round(Math.max(sx,sy)));
+
+      ctx.strokeStyle='red'; ctx.lineWidth = lineW; ctx.strokeRect(bleedExport, bleedExport, OUT_W - 2*bleedExport, OUT_H - 2*bleedExport);
+      ctx.strokeStyle='#27ae60'; ctx.lineWidth = lineW; ctx.strokeRect(safeExport, safeExport, OUT_W - 2*safeExport, OUT_H - 2*safeExport);
+      ctx.fillStyle='#2196f3'; ctx.fillRect(Math.round(centerExport), 0, lineW, OUT_H);
+    }
+
+    return canvas;
+  }
+  // Export ZIP (images named razvorot0, razvorot1...)
+  async function exportZip(){
+    if(typeof JSZip==='undefined' || typeof saveAs==='undefined'){ alert('JSZip или FileSaver не загружены.'); return; }
+    const includeGuides = true; // всегда включены в превью
+    const sel = document.getElementById('exportScale').value;
+    const mult = EXPORT_MULT[sel] || 1;
+    const zip = new JSZip();
+    const wraps = [...spreadsEl.children];
+    const OVERDRAW = 2; // pixels to overdraw on right and bottom
+
+    for(let i=0;i<wraps.length;i++){
+      const wrap = wraps[i];
+      const spread = wrap.querySelector('.spread');
+      const type = wrap.querySelector('.sel').value;
+
+      const logicalW = (type===TYPES.COVER)?LOGICAL.COVER_W:LOGICAL.SPREAD_W;
+      const logicalH = LOGICAL.H;
+      const OUT_W = Math.round(logicalW * mult);
+      const OUT_H = Math.round(logicalH * mult);
+
+      const canvas = document.createElement('canvas'); canvas.width = OUT_W; canvas.height = OUT_H;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,OUT_W,OUT_H);
+
+      const dispW = parseFloat(getComputedStyle(spread).getPropertyValue('--cw')) || spread.clientWidth || (logicalW*DISPLAY_SCALE);
+      const dispH = parseFloat(getComputedStyle(spread).getPropertyValue('--ch')) || spread.clientHeight || (logicalH*DISPLAY_SCALE);
+      const sx = OUT_W / dispW; const sy = OUT_H / dispH;
+
+      let coverOriginalFile = null;
+      const slots = spread.querySelectorAll('.slot');
+      for(const slot of slots){
+        const relLeft = slot.offsetLeft, relTop = slot.offsetTop;
+        const relW = slot.clientWidth, relH = slot.clientHeight;
+        const bigX = Math.round(relLeft * sx), bigY = Math.round(relTop * sy),
+              bigW = Math.round(relW * sx), bigH = Math.round(relH * sy);
+
+        // slot background
+        ctx.fillStyle = '#f2f2f2'; ctx.fillRect(bigX, bigY, bigW, bigH);
+
+        const imgEl = slot.querySelector('.slot-img');
+        if(!imgEl || !imgEl.src) continue;
+        // capture original file for cover (Разворот 0) to include in ZIP
+        if(i===0 && slot._origFile) coverOriginalFile = slot._origFile;
+
+        const file = slot._origFile || null;
+        const srcURL = file ? URL.createObjectURL(file) : imgEl.src;
+        try{
+          const image = await loadImageForExport(srcURL);
+          const st = slot._st || { iw:image.naturalWidth||image.width, ih:image.naturalHeight||image.height, fit:1, userScale:1, tx:0, ty:0 };
+
+          const dispWimg = st.iw * st.fit * st.userScale;
+          const dispHimg = st.ih * st.fit * st.userScale;
+
+          const slotCenterX = relLeft + relW/2;
+          const slotCenterY = relTop + relH/2;
+          const imgLeft = slotCenterX - dispWimg/2 + st.tx;
+          const imgTop  = slotCenterY - dispHimg/2 + st.ty;
+
+          const offXInDisp = relLeft - imgLeft;
+          const offYInDisp = relTop  - imgTop;
+
+          const dispToNatX = st.iw / dispWimg;
+          const dispToNatY = st.ih / dispHimg;
+
+          let sx0 = Math.round(offXInDisp * dispToNatX);
+          let sy0 = Math.round(offYInDisp * dispToNatY);
+          let sw0 = Math.round(relW * dispToNatX);
+          let sh0 = Math.round(relH * dispToNatY);
+
+          if(sx0 < 0){ sw0 += sx0; sx0 = 0; }
+          if(sy0 < 0){ sh0 += sy0; sy0 = 0; }
+          const natW = image.naturalWidth || image.width; const natH = image.naturalHeight || image.height;
+          if(sx0 + sw0 > natW) sw0 = natW - sx0;
+          if(sy0 + sh0 > natH) sh0 = natH - sy0;
+          sw0 = Math.max(1, sw0); sh0 = Math.max(1, sh0);
+
+          // compute overdraw on destination; clamp to canvas bounds so we never draw outside
+          const drawW = Math.max(1, Math.min(OUT_W - bigX, bigW + OVERDRAW));
+          const drawH = Math.max(1, Math.min(OUT_H - bigY, bigH + OVERDRAW));
+
+          ctx.drawImage(image, sx0, sy0, sw0, sh0, bigX, bigY, drawW, drawH);
+
+          // draw slot outline if guides enabled
+          if(includeGuides){
+            ctx.save();
+            ctx.strokeStyle = '#bbbbbb';
+            ctx.lineWidth = Math.max(1, Math.round(Math.max(sx, sy) * 0.6));
+            ctx.setLineDash([6,4]);
+            ctx.strokeRect(bigX, bigY, Math.max(0, bigW), Math.max(0,bigH));
+            ctx.restore();
+          }
+        }catch(err){ console.warn('Export draw err', err); }
+        finally { if(file) URL.revokeObjectURL(srcURL); }
+      }
+
+      // guides: red/green/center (only when checkbox on)
+      if(includeGuides){
+        const bleedLogical = (type===TYPES.COVER)?64:18;
+        const safeLogical  = (type===TYPES.COVER)?84:36;
+        const bleedExport  = bleedLogical * mult;
+        const safeExport   = safeLogical * mult;
+        const centerExport = (logicalW/2) * mult;
+        const lineW = Math.max(1, Math.round(Math.max(sx,sy)));
+
+        ctx.strokeStyle='red'; ctx.lineWidth = lineW; ctx.strokeRect(bleedExport, bleedExport, OUT_W - 2*bleedExport, OUT_H - 2*bleedExport);
+        ctx.strokeStyle='#27ae60'; ctx.lineWidth = lineW; ctx.strokeRect(safeExport, safeExport, OUT_W - 2*safeExport, OUT_H - 2*safeExport);
+        ctx.fillStyle='#2196f3'; ctx.fillRect(Math.round(centerExport), 0, lineW, OUT_H);
+      }
+
+      const blob = await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.95));
+      zip.file(`razvorot${i}.jpg`, blob);
+      // if this is cover (spread 0) and has original file, include it in subfolder 'Обложка'
+      if(i===0 && typeof coverOriginalFile !== 'undefined' && coverOriginalFile) {
+        try{ zip.folder('Обложка').file(coverOriginalFile.name, coverOriginalFile); }catch(e){ console.warn('Could not add original cover to ZIP', e); }
+      }
+      await new Promise(r=>setTimeout(r,20));
+    }
+
+    const title = (bookTitleInput.value.trim() || 'Book');
+    const filename = `Развороты_${title}_${tsName()}.zip`;
+    const content = await zip.generateAsync({type:'blob'});
+    saveAs(content, filename);
+  }
+
+  function loadImageForExport(src){
+    return new Promise((res, rej)=>{
+      const img = new Image(); img.crossOrigin='anonymous';
+      img.onload = ()=> res(img);
+      img.onerror = e=> rej(e);
+      img.src = src;
+    });
+  }
+
+    // Save book to ZIP
+    async function saveBookToZip() {
+        if (!ensureAllFields()) return;
+        if (typeof JSZip === 'undefined' || typeof saveAs === 'undefined') { alert('JSZip или FileSaver не загружены.'); return; }
+        const zip = new JSZip();
+        const fileToName = new Map();
+        const compressOriginals = document.getElementById('compressOriginals')?.checked ?? true;
+        // Показ оверлея
+        const overlay = document.getElementById('saveProgressOverlay');
+        const progressBar = document.getElementById('saveProgressBar');
+        const progressText = document.getElementById('saveProgressText');
+        const progressTitle = document.querySelector('.save-progress-title');
+
+        overlay.classList.remove('hidden');
+
+        // Количество только реальных фото в галерее (без слотов разворотов)
+        let totalPhotos = 0;
+        state.days.forEach(day => totalPhotos += day.items.length);
+
+        progressTitle.textContent = 'Подготовка и сжатие файлов';
+        progressText.textContent = `Фотографий в галерее: ${totalPhotos}`;
+        progressBar.style.width = '0%';
+
+        let processedPhotos = 0;
+        const usedNames = new Set();
+        const uniqueName = (origName) => {
+            const parts = (origName || 'image').split('.');
+            const ext = parts.length > 1 ? ('.' + parts.pop()) : '';
+            const base = parts.join('.') || 'image';
+            let candidate = base + ext;
+            let i = 1;
+            while (usedNames.has(candidate)) {
+                candidate = `${base}_${i++}${ext}`;
+            }
+            usedNames.add(candidate);
+            return candidate;
+        };
+        const addFileToImages = async (file, dayFolder) => {
+            if (!file) return null;
+            if (fileToName.has(file)) return fileToName.get(file);
+
+            const compress = document.getElementById('compressOriginals')?.checked ?? true;
+            let fileToSave = file;
+
+            if (compress && file.type.startsWith('image/')) {
+                try {
+                    fileToSave = await compressImage(file, 0.94);
+                } catch (err) {
+                    console.warn(`Сжатие не удалось для ${file.name}, используем оригинал`, err);
+                    fileToSave = file;
+                }
+            }
+
+            const name = file.name || 'photo.jpg';
+            try {
+                dayFolder.file(name, fileToSave);
+                fileToName.set(file, name);
+            } catch (e) {
+                console.warn('Ошибка записи в ZIP', e);
+                return null;
+            }
+            return name;
+        };
+
+        // === ИСПРАВЛЕНИЕ: правильное именование папок ===
+        const clean = (str) => str.replace(/[\/\\:*?"<>|]/g, '_');
+        const title = clean(bookTitleInput.value.trim()) || 'Без названия';
+        const expedition = clean(expeditionInput.value.trim()) || 'Без экспедиции';
+        const daysCount = daysCountInput.value;
+
+        // Определяем правильное склонение для дней
+        let daysText;
+        if (daysCount === '1') daysText = '1день';
+        else if (daysCount === '2') daysText = '2дня';
+        else if (daysCount === '3') daysText = '3дня';
+        else if (daysCount === '4') daysText = '4дня';
+        else daysText = `${daysCount}дней`;
+
+        // Формируем суффикс для папок
+        const baseSuffix = `_${daysText}_${title}_${expedition}_${tsName()}`;
+
+        const spreadsFolder = zip.folder('Развороты' + baseSuffix);
+        const galleryFolder = zip.folder('Галерея' + baseSuffix);
+        const coverFolder = zip.folder('Обложка' + baseSuffix);
+        // === КОНЕЦ ИСПРАВЛЕНИЯ ===
+
+        const addFileToCover = async (file, side) => {
+            if (!file) return null;
+
+            const compress = document.getElementById('compressOriginals')?.checked ?? true;
+            let fileToSave = file;
+
+            if (compress && file.type.startsWith('image/')) {
+                try {
+                    fileToSave = await compressImage(file, 0.94);
+                } catch (err) {
+                    console.warn(`Сжатие обложки не удалось для ${file.name}`, err);
+                    fileToSave = file;
+                }
+            }
+
+            const candidate = uniqueName(`cover_${side || ''}_${file.name || 'cover.jpg'}`);
+            try {
+                coverFolder.file(candidate, fileToSave);
+            } catch (e) {
+                console.warn('Ошибка записи обложки в ZIP', e);
+                return null;
+            }
+            return candidate;
+        };
+        const galleryDays = [];
+        const BATCH_SIZE = 12; // Размер батча — можно изменить на 10-15 для слабых ПК
+
+        for (let d = 0; d < state.days.length; d++) {
+            const day = state.days[d];
+            const dayFolder = galleryFolder.folder(day.name);
+            const dayFiles = [];
+
+            // Обработка по батчам
+            for (let i = 0; i < day.items.length; i += BATCH_SIZE) {
+                const batch = day.items.slice(i, i + BATCH_SIZE);
+
+                for (const g of batch) {
+                    const fn = await addFileToImages(g.file, dayFolder);
+                    if (fn) dayFiles.push(fn);
+
+                    // Обновление прогресса (только процент)
+                    processedPhotos++;
+                    const percent = Math.round((processedPhotos / totalPhotos) * 100);
+                    progressBar.style.width = `${percent}%`;
+                }
+
+                // Пауза между батчами для очистки памяти
+                await new Promise(resolve => setTimeout(resolve, 30)); // 30 мс — можно увеличить до 50-100
+            }
+
+            galleryDays.push({ name: day.name, files: dayFiles });
+        }
+        const spreadsData = [];
+        const wraps = [...spreadsEl.children];
+        for (const wrap of wraps) {
+            const spread = wrap.querySelector('.spread');
+            const type = wrap.querySelector('.sel').value;
+            const slots = spread.querySelectorAll('.slot');
+            const slotsData = [];
+            for (const slot of slots) {
+                if (slot._origFile) {
+                    const fn = addFileToImages(slot._origFile, galleryFolder);
+                    if (type === TYPES.COVER && slot.dataset.cover) { addFileToCover(slot._origFile, slot.dataset.cover); }
+                    const st = slot._st || {};
+                    const stCopy = {
+                        iw: st.iw || 0,
+                        ih: st.ih || 0,
+                        fit: st.fit || 1,
+                        userScale: st.userScale || 1,
+                        tx: st.tx || 0,
+                        ty: st.ty || 0,
+                        has: !!st.has,
+                        origDay: slot._origDay,
+                        origIndex: slot._origIndex
+                    };
+                    slotsData.push({ image: fn, state: stCopy });
+                } else {
+                    slotsData.push({ image: null, state: null });
+                }
+            }
+            spreadsData.push({ type, slots: slotsData });
+        }
+        const book = {
+            meta: { title: bookTitleInput.value.trim() || '', expedition: expeditionInput.value.trim() || '', daysCount: state.days.length, created: new Date().toISOString() },
+            galleryDays: galleryDays,
+            spreads: spreadsData
+        };
+        const formatSel = document.getElementById('exportScale');
+        const fmtVal = formatSel ? formatSel.value : 'large';
+        const mult = (fmtVal === 'large') ? 4 : ((fmtVal === 'medium') ? 2 : 1);
+        const fmtType = 'image/jpeg';
+        for (let i = 0; i < wraps.length; i++) {
+            const wrap = wraps[i];
+            const spread = wrap.querySelector('.spread');
+            const type = wrap.querySelector('.sel').value;
+            const logicalW = (type === TYPES.COVER) ? LOGICAL.COVER_W : LOGICAL.SPREAD_W;
+            const logicalH = LOGICAL.H;
+            const OUT_W = Math.round(logicalW * mult);
+            const OUT_H = Math.round(logicalH * mult);
+            const c = await drawSpreadToCanvas(spread, type, OUT_W, OUT_H, false);
+            await new Promise(r => setTimeout(r, 10));
+            const blob = await new Promise(res => c.toBlob(res, fmtType, 0.92));
+            spreadsFolder.file('razvorot' + i + '.jpg', blob);
+        }
+        zip.file('book.json', JSON.stringify(book, null, 2));
+
+        // === ИСПРАВЛЕНИЕ: правильное имя архива ===
+        const fname = `Книга_${daysText}_${title}_${expedition}_${tsName()}.zip`;
+        // Завершение прогресса
+        progressBar.style.width = '100%';
+        progressText.textContent = `Готово! Создание ZIP...`;
+        progressTitle.textContent = 'Создание ZIP...';
+
+        // Пауза, чтобы пользователь увидел 100%
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Скрытие оверлея
+        overlay.classList.add('hidden');
+        const content = await zip.generateAsync({ type: 'blob' });
+        saveAs(content, fname);
+    }
+
+  // Load book from ZIP
+  async function loadBookFromZipFile(file){
+    if(typeof JSZip==='undefined'){ alert('JSZip не загружен.'); return; }
+    try{
+      const data = await JSZip.loadAsync(file);
+      if(!data.files['book.json']){ alert('В архиве нет book.json'); return; }
+      const bookJson = await data.file('book.json').async('string');
+      const book = JSON.parse(bookJson);
+      // restore title from book meta or zip filename (without extension)
+      try{
+        const inferredTitle = (book.meta && book.meta.title && book.meta.title.trim()) ? book.meta.title.trim() : (file && file.name ? file.name.replace(/\.[^/.]+$/, '') : '');
+        if(inferredTitle) bookTitleInput.value = inferredTitle;
+      }catch(e){ /* ignore */ }
+      if(book.meta && book.meta.expedition) expeditionInput.value = book.meta.expedition;
+      if(book.meta && book.meta.daysCount) daysCountInput.value = book.meta.daysCount;
+
+      const imageFiles = {};
+      const imgNames = new Set();
+      (book.galleryDays || []).forEach(day => day.files.forEach(n=>imgNames.add(n)));
+      for(const sp of (book.spreads||[])){
+        for(const s of (sp.slots||[])){
+          if(s.image) imgNames.add(s.image);
+        }
+      }
+
+      const zipFileKeys = Object.keys(data.files || {});
+      const missingNames = [];
+      for(const name of imgNames){
+        // try several common folders and fallbacks
+        const candidates = [
+          'images/' + name,
+          'Галерея/' + name,
+          'gallery/' + name,
+          name
+        ];
+        let foundPath = null;
+        for(const c of candidates){
+          if(data.files[c]){ foundPath = c; break; }
+        }
+        if(!foundPath){
+          // try any entry that ends with '/'+name or equals name
+          foundPath = zipFileKeys.find(k => k === name || k.endsWith('/' + name));
+        }
+        if(foundPath){
+          try{
+            const blob = await data.file(foundPath).async('blob');
+            try{
+              const f = new File([blob], name, { type: blob.type });
+              imageFiles[name] = f;
+            }catch(e){
+              blob.name = name;
+              imageFiles[name] = blob;
+            }
+          }catch(e){
+            console.warn('Failed to read blob for', foundPath, e);
+            missingNames.push(name);
+          }
+        } else {
+          console.warn('Image not found in zip (tried images/, Галерея/, gallery/ and root):', name);
+          missingNames.push(name);
+        }
+      }
+
+      // clear current project
+      [...spreadsEl.children].forEach(w=>{
+        const spread = w.querySelector('.spread');
+        spread.querySelectorAll('.slot').forEach(s=>{
+          if(s._origFile) { addSingleFileToGallery(s._origFile); s._origFile = null; }
+        });
+      });
+      spreadsEl.innerHTML = '';
+        galleryListEl.innerHTML = '';
+        // Полная очистка старых thumbnails
+        previewURLs.forEach(url => URL.revokeObjectURL(url));
+        previewURLs.clear();
+
+        state.days.forEach(day => {
+            day.items.forEach(item => {
+                if (item.preview && item.preview.startsWith('blob:')) {
+                    URL.revokeObjectURL(item.preview);
+                }
+            });
+        });
+      state.days = [{ name: "День 1", items: [] }];
+      state.currentDay = 0;
+      state.count = 0;
+
+      // Rebuild spreads
+      for(const sp of (book.spreads||[])){
+        addSpreadReal(sp.type || null);
+        const wrap = spreadsEl.lastElementChild;
+        const spread = wrap.querySelector('.spread');
+        const sel = wrap.querySelector('.sel');
+        sel.value = sp.type || TYPES.T2;
+        buildLayout(spread, sel.value);
+
+        let coverOriginalFile = null;
+      const slots = spread.querySelectorAll('.slot');
+        for(let i=0;i<slots.length;i++){
+          const sd = (sp.slots && sp.slots[i]) || null;
+            if (sd?.image && imageFiles[sd.image]) {
+                const file = imageFiles[sd.image];
+                const slot = slots[i];
+                slot._origFile = file;
+                const fr = new FileReader();
+                fr.onload = e => {
+                    const imgEl = slot.querySelector('.slot-img');
+                    imgEl.onload = () => {
+                        const st = slot._st;
+                        st.iw = imgEl.naturalWidth;
+                        st.ih = imgEl.naturalHeight;
+                        st.has = true;
+                        if (sd.state) {
+                            st.fit = sd.state.fit || 1;
+                            st.userScale = sd.state.userScale || 1;
+                            st.tx = sd.state.tx || 0;
+                            st.ty = sd.state.ty || 0;
+                            // Восстанавливаем origDay и origIndex
+                            slot._origDay = sd.state.origDay;
+                            slot._origIndex = sd.state.origIndex;
+                            slot.apply();
+                        } else {
+                            slot.fit();
+                        }
+                    };
+                    imgEl.src = e.target.result;
+                    slot.querySelector('.hint').style.display = 'none';
+                };
+                fr.readAsDataURL(file);
+            }
+        }
+      }
+
+      // restore gallery days
+if(book.meta && book.meta.title) bookTitleInput.value = book.meta.title;
+if(book.meta && book.meta.expedition) expeditionInput.value = book.meta.expedition;
+if(book.meta && book.meta.daysCount) daysCountInput.value = book.meta.daysCount;
+
+// === Восстановление текстов обложки ===
+if (book.meta?.coverTexts) {
+  coverTexts = book.meta.coverTexts;
+  coverTexts.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'cover-text';
+    el.textContent = t.text;
+    el.dataset.id = t.id;
+    el.style.fontFamily = t.font;
+    el.style.fontSize = t.size + 'px';
+    el.style.color = t.color;
+    el.style.left = t.x + 'px';
+    el.style.top = t.y + 'px';
+    
+    const frontSlot = spreadsEl.children[0]?.querySelector('.slot');
+    if (frontSlot) {
+      frontSlot.appendChild(el);
+      makeTextDraggable(el);
+    }
+  });
+  updateTextList();
+}
+
+state.days = [];
+      if(book.galleryDays && Array.isArray(book.galleryDays)){
+        for(const dayData of book.galleryDays){
+          const dayItems = [];
+          for(const name of dayData.files){
+            if(imageFiles[name]) dayItems.push({ id: 'g' + Date.now() + Math.random(), file: imageFiles[name], preview: URL.createObjectURL(imageFiles[name]) });
+          }
+          state.days.push({ name: dayData.name || `День ${state.days.length + 1}`, items: dayItems });
+        }
+      }
+      if(state.days.length === 0) state.days = [{ name: "День 1", items: [] }];
+      state.currentDay = 0;
+      renderGalleryDay(state.currentDay);
+      daysCountInput.value = state.days.length;
+
+      // activate first spread
+      if(spreadsEl.children.length){
+        [...spreadsEl.children].forEach(w=>w.classList.remove('active'));
+        spreadsEl.children[0].classList.add('active');
+        centerActive(spreadsEl.children[0]);
+      }
+
+      renumber();
+      if(typeof missingNames !== 'undefined' && missingNames.length){
+        alert('Книга частично загружена. Не найдены изображения: ' + missingNames.join(', ') + '. Они пропущены.');
+      } else {
+        alert('Книга загружена успешно.');
+      }
+    }catch(err){
+      console.error(err);
+      alert('Ошибка при загрузке книги: ' + (err && err.message ? err.message : err));
+    }
+  }
+
+  function ensureAllFields() {
+  const title = bookTitleInput?.value.trim();
+  const expedition = expeditionInput?.value.trim();
+  if (!title) {
+    alert('Пожалуйста, заполните поле "Название книги"');
+    bookTitleInput?.focus();
+    return false;
+  }
+  if (!expedition) {
+    alert('Пожалуйста, заполните поле "Экспедиция"');
+    expeditionInput?.focus();
+    return false;
+  }
+  return true;
+  }
+
+  // UI bindings
+  btnAdd.addEventListener('click', ()=> addSpreadReal(null));
+  btnRemove.addEventListener('click', removeActive);
+  btnClear.addEventListener('click', clearActive);
+
+  btnDownloadZip.addEventListener('click', async ()=>{
+  if(!ensureAllFields()) return;
+  btnDownloadZip.disabled = true; const old = btnDownloadZip.textContent; btnDownloadZip.textContent='Генерация ZIP...';
+  try{ await exportZip(); }catch(e){ alert('Ошибка экспорта: '+(e&&e.message?e.message:e)); }
+  btnDownloadZip.disabled=false; btnDownloadZip.textContent=old;
+  });
+
+  btnSaveBook.addEventListener('click', async ()=>{
+  if(!ensureAllFields()) { return; }
+  btnSaveBook.disabled = true; const old = btnSaveBook.textContent; btnSaveBook.textContent='Готовлю...';
+  try{ await saveBookToZip(); }catch(e){ alert('Ошибка сохранения: '+(e&&e.message?e.message:e)); }
+  btnSaveBook.disabled = false; btnSaveBook.textContent = old;
+  });
+
+  btnLoadBook.addEventListener('click', ()=> loadBookInput.click());
+  loadBookInput.addEventListener('change', async ()=> {
+    if(loadBookInput.files && loadBookInput.files[0]) await loadBookFromZipFile(loadBookInput.files[0]);
+    loadBookInput.value = '';
+  });
+
+    function ensureBookInfo() {
+        const title = bookTitleInput?.value?.trim();
+        const expedition = expeditionInput?.value?.trim();
+
+        if (!title) {
+            alert('Пожалуйста, введите название книги');
+            bookTitleInput?.focus();
+            return false;
+        }
+
+        if (!expedition) {
+            alert('Пожалуйста, заполните поле "Экспедиция"');
+            expeditionInput?.focus();
+            return false;
+        }
+
+        return true;
+    }
+
+    btnPreview.addEventListener('click', async () => {
+        if (!ensureBookInfo()) return;
+
+        btnPreview.disabled = true;
+        const originalText = btnPreview.textContent;
+        btnPreview.textContent = 'Генерация...';
+
+        try {
+            await createOverviewImage();
+        } catch (error) {
+            console.error('Ошибка при создании превью:', error);
+            alert(
+                'Не удалось создать превью.\n\n' +
+                (error?.message || 'Неизвестная ошибка. Посмотрите консоль (F12).')
+            );
+        } finally {
+            btnPreview.disabled = false;
+            btnPreview.textContent = originalText;
+        }
+    });
+
+  // Uploader
+  uploaderInput.addEventListener('change', (e)=>{ handleFilesFromUploader(uploaderInput.files); uploaderInput.value=''; });
+  uploaderWrap.addEventListener('dragover', (e)=>{ e.preventDefault(); uploaderWrap.classList.add('drag-over'); });
+  uploaderWrap.addEventListener('dragleave', ()=> uploaderWrap.classList.remove('drag-over'));
+  uploaderWrap.addEventListener('drop', (e)=>{ e.preventDefault(); uploaderWrap.classList.remove('drag-over'); const files=e.dataTransfer.files; if(files && files.length) handleFilesFromUploader(files); });
+  // only trigger native input click when clicking the wrapper (not when clicking the invisible input itself) to avoid double-opening
+  uploaderWrap.addEventListener('click', (e)=>{ if(e.target === uploaderWrap) uploaderInput.click(); });
+
+  
+  // Large uploader overlay handlers
+  // Close overlay with ESC
+  window.addEventListener('keydown', (e)=>{
+    if(e.key==='Escape'){
+      const overlay = document.getElementById('uploaderOverlay');
+      if(overlay && !overlay.classList.contains('hidden')){
+        overlay.classList.add('hidden');
+        overlay.setAttribute('aria-hidden','true');
+      }
+    }
+  });
+
+  const uploaderInputLarge = document.getElementById('uploaderInputLarge');
+  const uploaderOverlay = document.getElementById('uploaderOverlay');
+  const overlayDrop = document.getElementById('overlayDrop');
+  const overlayClose = document.getElementById('overlayClose');
+  const openOverlayBtn = document.getElementById('openOverlay');
+  if(openOverlayBtn){
+    openOverlayBtn.addEventListener('click', (e)=>{ e.stopPropagation(); uploaderOverlay.classList.remove('hidden'); uploaderOverlay.setAttribute('aria-hidden','false'); });
+  }
+  if(overlayClose){
+    overlayClose.addEventListener('click', ()=>{ uploaderOverlay.classList.add('hidden'); uploaderOverlay.setAttribute('aria-hidden','true'); });
+  }
+  if(uploaderInputLarge){
+    uploaderInputLarge.addEventListener('change', (e)=>{ handleFilesFromUploader(uploaderInputLarge.files); uploaderInputLarge.value=''; uploaderOverlay.classList.add('hidden'); uploaderOverlay.setAttribute('aria-hidden','true'); });
+  }
+  if(overlayDrop){
+    overlayDrop.addEventListener('dragover', (e)=>{ e.preventDefault(); overlayDrop.classList.add('drag-over'); });
+    overlayDrop.addEventListener('dragleave', ()=> overlayDrop.classList.remove('drag-over'));
+    overlayDrop.addEventListener('drop', (e)=>{ e.preventDefault(); overlayDrop.classList.remove('drag-over'); const files = e.dataTransfer.files; if(files && files.length) { handleFilesFromUploader(files); } });
+    overlayDrop.addEventListener('click', ()=>{ if(uploaderInputLarge) uploaderInputLarge.click(); });
+  }
+
+// Day pager setup (add to gallery or bottombar; here assuming added to #gallery)
+const galleryPager = el('div', 'gallery-pager');
+galleryPager.id = 'gallery-pager';
+document.getElementById('gallery').appendChild(galleryPager);
+
+// Bind day buttons
+galleryPager.addEventListener('click', (e) => {
+  if(e.target.id === 'prevDay' && state.currentDay > 0) { state.currentDay--; renderGalleryDay(state.currentDay); }
+  if(e.target.id === 'nextDay' && state.currentDay < state.days.length - 1) { state.currentDay++; renderGalleryDay(state.currentDay); }
+  if(e.target.id === 'addDay') { addNewDay(); }
+  if(e.target.id === 'removeDay') { removeCurrentDay(); }
+});
+
+// Bind days count input
+daysCountInput.addEventListener('change', handleDaysCountChange);
+
+    let coverTexts = [];
+    let previewURLs = new Set(); // Для отслеживания и чистки thumbnail URL
+
+    // Создаёт лёгкий thumbnail и возвращает ObjectURL (отзывать потом!)
+    async function generateThumbnail(file, maxSide = 180, quality = 0.78) {
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let w = img.naturalWidth;
+                let h = img.naturalHeight;
+
+                // Сохраняем пропорции
+                if (w > h) {
+                    if (w > maxSide) { h = Math.round(h * (maxSide / w)); w = maxSide; }
+                } else {
+                    if (h > maxSide) { w = Math.round(w * (maxSide / h)); h = maxSide; }
+                }
+
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+
+                canvas.toBlob(blob => {
+                    if (blob) {
+                        const thumbUrl = URL.createObjectURL(blob);
+                        previewURLs.add(thumbUrl);
+                        resolve(thumbUrl);
+                    } else {
+                        reject(new Error('Не удалось создать thumbnail'));
+                    }
+                    URL.revokeObjectURL(url); // сразу чистим оригинальный URL
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Ошибка загрузки изображения'));
+            };
+            img.src = url;
+        });
+    }
+    // Функция для сжатия оригинального изображения (JPEG, с сохранением имени)
+    async function compressImage(file, quality = 0.94) {
+        if (file.size < 400 * 1024) return file; // Не сжимаем маленькие файлы
+
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                canvas.toBlob(blob => {
+                    if (!blob) {
+                        reject(new Error('Не удалось сжать изображение'));
+                        return;
+                    }
+                    const compressedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: file.lastModified
+                    });
+                    resolve(compressedFile);
+                    URL.revokeObjectURL(url);
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Ошибка загрузки изображения'));
+            };
+            img.src = url;
+        });
+    }
+// Список текстов
+  function updateTextList() {
+    textList.innerHTML = '';
+    coverTexts.forEach(t => {
+      const item = document.createElement('div');
+      item.className = 'cover-text-item';
+      item.innerHTML = `
+        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${t.text}</span>
+        <button data-id="${t.id}">×</button>
+      `;
+      textList.appendChild(item);
+    });
+
+    textList.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const el = document.querySelector(`.cover-text[data-id="${id}"]`);
+        if (el) el.remove();
+        coverTexts = coverTexts.filter(x => x.id !== id);
+        updateTextList();
+      });
+    });
+  }
+
+  // Перетаскивание
+  function makeTextDraggable(el) {
+  let isDragging = false;
+  let startX, startY, startLeft, startTop;
+  let currentSlot = el.parentElement;
+
+  // Сохраняем начальные координаты
+  function getPosition() {
+    return {
+      left: parseFloat(el.style.left) || 0,
+      top: parseFloat(el.style.top) || 0
+    };
+  }
+
+  el.onmousedown = (e) => {
+    e.stopPropagation();
+    if (e.button !== 0) return; // только левая кнопка
+
+    isDragging = true;
+    const pos = getPosition();
+    startLeft = pos.left;
+    startTop = pos.top;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    // Поднимаем элемент
+    el.style.zIndex = '1000';
+    el.style.transition = 'none';
+
+    document.onmousemove = (e) => {
+      if (!isDragging) return;
+
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      el.style.left = (startLeft + dx) + 'px';
+      el.style.top = (startTop + dy) + 'px';
+
+      // Проверяем, под каким слотом курсор
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const targetSlot = under?.closest('.slot');
+      if (targetSlot && targetSlot !== currentSlot) {
+        // Перемещаем в новый слот
+        targetSlot.appendChild(el);
+        currentSlot = targetSlot;
+
+        // Пересчитываем позицию относительно нового слота
+        const rect = currentSlot.getBoundingClientRect();
+        const newLeft = e.clientX - rect.left;
+        const newTop = e.clientY - rect.top;
+        el.style.left = newLeft + 'px';
+        el.style.top = newTop + 'px';
+
+        // Обновляем начальные координаты
+        startLeft = newLeft;
+        startTop = newTop;
+        startX = e.clientX;
+        startY = e.clientY;
+      }
+    };
+
+    // === Двойной клик — редактирование ===
+// === ДВОЙНОЙ КЛИК — РЕДАКТИРОВАНИЕ ===
+el.ondblclick = (e) => {
+  e.stopPropagation();
+
+  const currentText = el.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentText;
+  input.style.position = 'absolute';
+  input.style.left = '0';
+  input.style.top = '0';
+  input.style.width = '100%';
+  input.style.height = '100%';
+  input.style.fontFamily = el.style.fontFamily;
+  input.style.fontSize = el.style.fontSize;
+  input.style.color = el.style.color;
+  input.style.background = 'rgba(255,255,255,0.95)';
+  input.style.border = '2px solid #49aaff';
+  input.style.borderRadius = '4px';
+  input.style.padding = '4px';
+  input.style.outline = 'none';
+  input.style.zIndex = '1001';
+
+  const parent = el.parentElement;
+  const rect = el.getBoundingClientRect();
+  const parentRect = parent.getBoundingClientRect();
+
+  // Сохраняем оригинальный position слота
+  const originalPosition = parent.style.position;
+  parent.style.position = 'relative';
+
+  el.style.visibility = 'hidden';
+
+  // Позиционируем input точно над текстом
+  input.style.left = (rect.left - parentRect.left) + 'px';
+  input.style.top = (rect.top - parentRect.top) + 'px';
+  input.style.width = rect.width + 'px';
+  input.style.height = rect.height + 'px';
+
+  parent.appendChild(input);
+  input.focus();
+  input.select();
+
+  const save = () => {
+    const newText = input.value.trim();
+    if (newText) {
+      el.textContent = newText;
+      const item = coverTexts.find(t => t.id === el.dataset.id);
+      if (item) item.text = newText;
+    }
+    input.remove();
+    el.style.visibility = 'visible';
+    parent.style.position = originalPosition; // ← ВОССТАНАВЛИВАЕМ!
+    updateTextList();
+  };
+
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      save();
+    } else if (e.key === 'Escape') {
+      input.remove();
+      el.style.visibility = 'visible';
+      parent.style.position = originalPosition; // ← ВОССТАНАВЛИВАЕМ!
+    }
+  };
+
+  input.onblur = save;
+};
+
+    document.onmouseup = () => {
+      if (!isDragging) return;
+      isDragging = false;
+
+      document.onmousemove = document.onmouseup = null;
+      el.style.zIndex = '15';
+      el.style.transition = '';
+
+      // Сохраняем финальную позицию
+      const final = getPosition();
+      const item = coverTexts.find(t => t.id === e.target.dataset.id);
+      if (item) {
+        item.x = final.left;
+        item.y = final.top;
+        item.slot = currentSlot.dataset.cover || 'front';
+      }
+    };
+  };
+}
+
+// Init: cover + 13 sequence spreads + final T11
+    (function init(){
+  addSpreadReal(TYPES.COVER);
+  for(let i=0;i<13;i++) {
+    const typeIndex = i % seqTypes.length;
+    addSpreadReal(seqTypes[typeIndex]);
+  }
+  addSpreadReal(TYPES.T11);
+  if(spreadsEl.children.length){
+    [...spreadsEl.children].forEach(w=>w.classList.remove('active'));
+    spreadsEl.children[0].classList.add('active');
+    centerActive(spreadsEl.children[0]);
+  }
+  renderGalleryDay(0);
+
+  // === Режим Книга / Обложка ===
+  const viewModeSelect = document.getElementById('viewMode');
+  const addBtn = document.getElementById('add');
+  const removeBtn = document.getElementById('remove');
+  const firstSpreadWrap = spreadsEl.children[0];
+
+  // ←←← ПЕРЕМЕЩЕНО ВВЕРХ
+  const coverEditor = document.getElementById('coverEditor');
+
+  // Всегда блокируем тип у обложки
+  function lockCoverType() {
+    const coverSel = firstSpreadWrap.querySelector('.sel');
+    if (coverSel) {
+      coverSel.value = TYPES.COVER;
+      coverSel.disabled = true;
+    }
+  }
+
+  function updateVisibility() {
+    const isCoverMode = viewModeSelect.value === 'cover';
+    
+    addBtn.style.display = isCoverMode ? 'none' : '';
+    removeBtn.style.display = isCoverMode ? 'none' : '';
+
+    for (let i = 0; i < spreadsEl.children.length; i++) {
+      const wrap = spreadsEl.children[i];
+      if (isCoverMode) {
+        wrap.style.display = (i === 0) ? 'flex' : 'none';
+        if (i === 0) {
+          wrap.classList.add('active');
+          centerActive(wrap);
+        }
+      } else {
+        wrap.style.display = 'flex';
+      }
+    }
+
+    // Теперь coverEditor уже объявлен!
+    if (coverEditor) {
+      coverEditor.classList.toggle('show', isCoverMode);
+    }
+  }
+
+  viewModeSelect.addEventListener('change', updateVisibility);
+  lockCoverType();
+  updateVisibility();
+
+  // === Редактирование обложки ===
+  const addCoverTextBtn = document.getElementById('addCoverText');
+  const coverTextInput = document.getElementById('coverTextInput');
+  const coverFont = document.getElementById('coverFont');
+  const coverSize = document.getElementById('coverSize');
+  const coverColor = document.getElementById('coverColor');
+  const textList = document.getElementById('textList');
+
+  // Добавление текста
+  addCoverTextBtn.addEventListener('click', () => {
+    const text = coverTextInput.value.trim();
+    if (!text) return alert('Введите текст');
+
+    const id = 'txt' + Date.now();
+    const el = document.createElement('div');
+    el.className = 'cover-text';
+    el.textContent = text;
+    el.dataset.id = id;
+    el.style.fontFamily = coverFont.value;
+    el.style.fontSize = coverSize.value + 'px';
+    el.style.color = coverColor.value;
+    el.style.left = '50px';
+    el.style.top = '150px';
+
+    const frontSlot = firstSpreadWrap.querySelector('.slot[data-cover="front"]') || firstSpreadWrap.querySelector('.slot');
+    frontSlot.appendChild(el);
+
+    coverTexts.push({
+      id, text,
+      font: coverFont.value,
+      size: parseInt(coverSize.value),
+      color: coverColor.value,
+      x: 50, y: 150
+    });
+
+    coverTextInput.value = '';
+    updateTextList();
+    makeTextDraggable(el);
+  });
+
+})();
+})(); // end closure
+</script>
+<div id="saveProgressOverlay" class="save-overlay hidden">
+    <div class="save-progress-container">
+        <div class="save-progress-title">Подготовка файлов...</div>
+        <div class="save-progress-bar">
+            <div id="saveProgressBar" class="save-progress-fill" style="width:0%"></div>
+        </div>
+        <div id="saveProgressText">0 / 0</div>
+    </div>
+</div>
+</body>
+</html>
